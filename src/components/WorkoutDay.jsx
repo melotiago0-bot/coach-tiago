@@ -1,0 +1,105 @@
+import { useState } from 'react';
+import { saveWorkoutDone } from '../lib/store';
+import { getSwimAnalysis, getDaysToRace, getCurrentWeekPlan } from '../lib/engine';
+import { templates } from '../lib/exercises';
+
+function ExerciseItem({ ex, fingerState }) {
+  const [open, setOpen] = useState(false);
+  const needsFingerMod = fingerState !== 'sem dor' && ex.fingerMod;
+  const sets = ex.sets || 1;
+  const repsLabel = ex.duration ? `${ex.duration} seg` : ex.reps ? `${ex.reps} reps` : '';
+  return (
+    <div className="exercise-item">
+      <div className="ex-header" onClick={() => setOpen(!open)}>
+        <div>
+          <div className="ex-title">{ex.name}</div>
+          <div className="ex-meta">{sets} × {repsLabel}</div>
+        </div>
+        <span className={`chevron ${open ? 'open' : ''}`}>›</span>
+      </div>
+      {open && (
+        <div className="ex-detail">
+          <p className="ex-cue">{ex.cue}</p>
+          {ex.hipNote && <div className="ex-mod adapt">anca esq: {ex.hipNote}</div>}
+          {needsFingerMod && <div className="ex-mod adapt">dedo: {ex.fingerMod}</div>}
+          <div className="ex-mods">
+            {ex.easier && <span className="ex-mod easier">mais fácil: {ex.easier}</span>}
+            {ex.harder && <span className="ex-mod harder">mais difícil: {ex.harder}</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SwimAnalysis({ checkin }) {
+  if (!checkin.swam) return null;
+  const analysis = getSwimAnalysis(checkin.swimMeters, checkin.swimMinutes);
+  if (!analysis) return null;
+  const weekPlan = getCurrentWeekPlan();
+  const daysToRace = getDaysToRace();
+  return (
+    <div className="card swim-analysis">
+      <div className="card-label">natação da manhã</div>
+      <div className="swim-header">
+        <div className="swim-big">{checkin.swimMeters}m</div>
+        <span className={`badge ${analysis.metTarget ? 'badge-ok' : 'badge-warn'}`}>{analysis.metTarget ? 'meta atingida' : 'abaixo da meta'}</span>
+      </div>
+      <div className="swim-stats">
+        <div className="swim-stat"><span>pace</span><strong>{analysis.pace}/100m</strong></div>
+        <div className="swim-stat"><span>zona fc</span><strong>{analysis.zone}</strong></div>
+        <div className="swim-stat"><span>projeção 5km</span><strong>{analysis.proj5kMin}h{String(analysis.proj5kSec).padStart(2,'0')}</strong></div>
+        <div className="swim-stat"><span>meta diária</span><strong>{weekPlan.daily}m</strong></div>
+      </div>
+      <div className="bar-track">
+        <div className="bar-fill" style={{ width: `${Math.min(100, Math.round((checkin.swimMeters / weekPlan.daily) * 100))}%` }} />
+      </div>
+      <div className="swim-hint">{daysToRace} dias para a prova · foco em volume, não velocidade</div>
+    </div>
+  );
+}
+
+export default function WorkoutDay({ checkin, workout }) {
+  const [done, setDone] = useState(false);
+  const [notes, setNotes] = useState('');
+  if (!checkin) return <div className="card center"><p>faz o check-in primeiro para ver o treino de hoje.</p></div>;
+  if (workout.type === 'none') return (
+    <div>
+      <SwimAnalysis checkin={checkin} />
+      <div className="card alert-box"><p>menos de 4h de sono — hoje é só uma caminhada leve de 10 minutos. recupera bem.</p></div>
+    </div>
+  );
+  const template = templates[workout.type];
+  if (!template) return null;
+  function handleDone() {
+    saveWorkoutDone({ type: workout.type, notes, swimMeters: checkin.swimMeters });
+    setDone(true);
+  }
+  return (
+    <div className="workout-day">
+      <SwimAnalysis checkin={checkin} />
+      <div className="card">
+        <div className="card-label">treino da tarde · {template.name} · {template.duration} min</div>
+        <div className="workout-meta">
+          <span className="badge badge-info">sono {checkin.sleep}h</span>
+          {checkin.finger !== 'sem dor' && <span className="badge badge-warn">dedo {checkin.finger}</span>}
+          <span className="badge badge-muted">{workout.reason}</span>
+        </div>
+        {template.blocks.map((block, i) => (
+          <div key={i} className="block">
+            <div className="block-title">{block.name}</div>
+            {block.exercises.map((ex, j) => <ExerciseItem key={j} ex={ex} fingerState={checkin.finger} />)}
+          </div>
+        ))}
+        {!done ? (
+          <div className="done-section">
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="notas do treino (opcional)..." rows={2} />
+            <button className="btn-primary" onClick={handleDone}>marcar como feito</button>
+          </div>
+        ) : (
+          <div className="done-confirm">treino registado</div>
+        )}
+      </div>
+    </div>
+  );
+}
