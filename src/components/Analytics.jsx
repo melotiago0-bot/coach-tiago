@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getRecentCheckins, getSwimHistory, getWeeklySummaries, getMonthlySummaries, getYearlySummaries } from '../lib/store';
 import { getDaysToRace, getPlanProgress, getSwimPlan } from '../lib/engine';
+
+const API = 'https://coach-tiago-api.onrender.com';
 
 function MiniChart({ data, color = '#1D9E75' }) {
   if (!data.length) return <div className="mini-chart-empty">sem dados</div>;
@@ -27,6 +29,8 @@ function MetricCard({ label, value, sub, color, chartData, chartColor }) {
 
 export default function Analytics() {
   const [period, setPeriod] = useState(7);
+  const [liveData, setLiveData] = useState(null);
+  const [loading, setLoading] = useState(true);
   const daysToRace = getDaysToRace();
   const progress = getPlanProgress();
   const swimPlan = getSwimPlan();
@@ -35,26 +39,65 @@ export default function Analytics() {
   const weeklySummaries = getWeeklySummaries(13);
   const monthlySummaries = getMonthlySummaries(12);
   const yearlySummaries = getYearlySummaries();
-  const avgSleep = checkins.length ? (checkins.reduce((s, c) => s + (c.sleep || 0), 0) / checkins.length).toFixed(1) : '—';
+
+  useEffect(() => {
+    fetch(`${API}/health-data/latest`)
+      .then(r => r.json())
+      .then(d => { setLiveData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const avgSleep = checkins.length
+    ? (checkins.reduce((s, c) => s + (c.sleep || 0), 0) / checkins.length).toFixed(1)
+    : liveData?.sleep_hours?.toFixed(1) || '—';
+
   const totalSwim = swimHistory.reduce((s, h) => s + h.meters, 0);
-  const avgPace = swimHistory.length ? swimHistory.reduce((s, h) => s + (h.minutes / (h.meters / 100)), 0) / swimHistory.length : null;
-  const avgPaceStr = avgPace ? `${Math.floor(avgPace)}:${String(Math.round((avgPace % 1) * 60)).padStart(2, '0')}` : '—';
+  const avgPace = swimHistory.length
+    ? swimHistory.reduce((s, h) => s + (h.minutes / (h.meters / 100)), 0) / swimHistory.length
+    : null;
+  const avgPaceStr = avgPace
+    ? `${Math.floor(avgPace)}:${String(Math.round((avgPace % 1) * 60)).padStart(2, '0')}`
+    : '—';
+
   const sleepData = checkins.slice(0, period).reverse().map(c => c.sleep || 0);
   const swimData = swimHistory.slice(0, period).reverse().map(h => h.meters);
   const weeklyVols = Object.values(weeklySummaries).slice(-8);
   const monthlyVols = Object.values(monthlySummaries).slice(-6);
   const yearlyVols = Object.values(yearlySummaries);
-  const isMock = checkins.length === 0;
+  const isMock = checkins.length === 0 && !liveData;
 
   return (
     <div className="analytics">
-      {isMock && <div className="alert-box warn">a mostrar dados de demonstração — faz o check-in diário para ver os teus dados reais</div>}
+      {isMock && (
+        <div className="alert-box warn">a mostrar dados de demonstração — faz o check-in diário para ver os teus dados reais</div>
+      )}
+
       <div className="race-countdown">
         <div className="countdown-num">{daysToRace}</div>
         <div className="countdown-label">dias para a prova · 19 julho</div>
         <div className="bar-track"><div className="bar-fill green" style={{ width: `${progress}%` }} /></div>
         <div className="countdown-sub">{progress}% do plano concluído</div>
       </div>
+
+      {liveData && liveData.date && (
+        <div className="card" style={{ marginBottom: '0.75rem' }}>
+          <div className="card-label">hoje · apple health · {liveData.date}</div>
+          <div className="grid2">
+            <MetricCard label="sono" value={`${liveData.sleep_hours?.toFixed(1) || '—'}h`} color="#7F77DD" />
+            <MetricCard label="hrv" value={liveData.hrv ? `${Math.round(liveData.hrv)}ms` : '—'} color="#1D9E75" />
+            <MetricCard label="fc repouso" value={liveData.resting_hr ? `${Math.round(liveData.resting_hr)}bpm` : '—'} color="#D85A30" />
+            <MetricCard label="passos" value={liveData.steps ? Math.round(liveData.steps).toLocaleString() : '—'} color="#378ADD" />
+            <MetricCard label="calorias" value={liveData.active_calories ? `${Math.round(liveData.active_calories)} kcal` : '—'} color="#EF9F27" />
+            <MetricCard label="natação" value={liveData.swim_meters ? `${Math.round(liveData.swim_meters)}m` : '—'} color="#1D9E75" />
+          </div>
+          {liveData.ts && (
+            <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>
+              última sync: {new Date(liveData.ts * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="period-tabs">
         {[7, 30, 90].map(d => (
           <button key={d} className={`period-tab ${period === d ? 'active' : ''}`} onClick={() => setPeriod(d)}>
@@ -62,11 +105,13 @@ export default function Analytics() {
           </button>
         ))}
       </div>
+
       <div className="section-title">sono</div>
       <div className="grid2">
         <MetricCard label="média" value={`${avgSleep}h`} color="var(--text)" chartData={sleepData} chartColor="#7F77DD" />
         <MetricCard label="noites 7h+" value={checkins.filter(c => c.sleep >= 7).length} sub={`em ${period} dias`} color="#1D9E75" />
       </div>
+
       <div className="section-title">natação</div>
       <div className="grid2">
         <MetricCard label="volume total" value={`${(totalSwim/1000).toFixed(1)}km`} color="#1D9E75" chartData={swimData} chartColor="#1D9E75" />
@@ -74,6 +119,7 @@ export default function Analytics() {
         <MetricCard label="sessões" value={swimHistory.length} sub={`em ${period} dias`} color="#378ADD" />
         <MetricCard label="projeção 5km" value={avgPace ? `${Math.floor(avgPace*50/60)}h${String(Math.round(avgPace*50%60)).padStart(2,'0')}` : '—'} sub="ao pace atual" color="#7F77DD" />
       </div>
+
       <div className="section-title">volume semanal</div>
       <div className="card">
         <div className="bar-chart">
@@ -90,6 +136,7 @@ export default function Analytics() {
           ))}
         </div>
       </div>
+
       <div className="section-title">volume mensal</div>
       <div className="card">
         <div className="bar-chart">
@@ -106,6 +153,7 @@ export default function Analytics() {
           ))}
         </div>
       </div>
+
       <div className="section-title">volume anual</div>
       <div className="card">
         <div className="bar-chart">
@@ -117,7 +165,7 @@ export default function Analytics() {
           )) : (
             <div className="bar-col">
               <div className="bar-col-fill" style={{ height: '4px', background: '#7F77DD', opacity: 0.3 }} />
-              <div className="bar-col-label">2025</div>
+              <div className="bar-col-label">2026</div>
             </div>
           )}
         </div>
