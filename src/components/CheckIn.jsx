@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { saveCheckin } from '../lib/store';
-import { decideWorkout } from '../lib/engine';
 
-export default function CheckIn({ onCheckinDone }) {
+export default function CheckIn({ onCheckinDone, liveHealth }) {
   const [sleep, setSleep] = useState(7);
   const [feeling, setFeeling] = useState('');
   const [finger, setFinger] = useState('a recuperar');
@@ -12,17 +11,31 @@ export default function CheckIn({ onCheckinDone }) {
   const [hasBJJ, setHasBJJ] = useState(false);
   const [notes, setNotes] = useState('');
 
+  useEffect(() => {
+    if (liveHealth?.sleep_hours) {
+      setSleep(Math.round(liveHealth.sleep_hours * 2) / 2);
+    }
+    if (liveHealth?.swim_meters && liveHealth.swim_meters > 0) {
+      setSwam(true);
+      setSwimMeters(Math.round(liveHealth.swim_meters));
+    }
+  }, [liveHealth]);
+
   function handleSubmit() {
     if (!feeling) return alert('indica como te sentes');
     const checkin = { sleep, feeling, finger, swam, swimMeters: swam ? swimMeters : 0, swimMinutes: swam ? swimMinutes : 0, hasBJJ, notes };
     saveCheckin(checkin);
-    const workout = decideWorkout({ sleep, hasBJJ, missedDays: 0 });
-    onCheckinDone(checkin, workout);
+    onCheckinDone(checkin);
   }
 
   return (
     <div className="checkin">
       <div className="card">
+        {liveHealth?.sleep_hours && (
+          <div className="alert-box info" style={{ marginBottom: '1rem' }}>
+            apple health: {liveHealth.sleep_hours.toFixed(1)}h de sono · fc repouso {Math.round(liveHealth.resting_hr)}bpm · hrv {Math.round(liveHealth.hrv)}ms
+          </div>
+        )}
         <div className="field">
           <label>horas de sono</label>
           <div className="slider-row">
