@@ -17,24 +17,11 @@ export default function App() {
   const missedDays = getMissedDays();
 
   useEffect(() => {
-    Promise.all([
-      fetch(`${API}/health-data/latest`).then(r => r.json()),
-      fetch(`${API}/health-data/workouts/today`).then(r => r.json()),
-    ]).then(([health, workoutsData]) => {
-      if (health.date) {
+    fetch(`${API}/health-data/latest`)
+      .then(r => r.json())
+      .then(health => {
+        if (!health.date) { setLoading(false); return; }
         setLiveHealth(health);
-
-        const workouts = workoutsData.workouts || [];
-        const swimWorkout = workouts.find(w =>
-          w.workout_type?.toLowerCase().includes('swim') ||
-          w.workout_type?.toLowerCase().includes('pool') ||
-          w.workout_type?.toLowerCase().includes('water')
-        );
-
-        const swimMeters = Math.round(health.swim_meters || 0);
-        const swimMinutes = swimWorkout
-          ? Math.round(swimWorkout.duration_min)
-          : 22;
 
         const w = decideWorkout({
           sleep: health.sleep_hours || 7,
@@ -43,22 +30,50 @@ export default function App() {
         });
         setWorkout(w);
 
-        const autoCheckin = {
-          sleep: health.sleep_hours || 7,
-          feeling: 'bem',
-          finger: 'a recuperar',
-          swam: swimMeters > 0,
-          swimMeters,
-          swimMinutes,
-          hasBJJ: health.has_bjj === 1,
-          notes: '',
-          fromHealth: true,
-        };
-        saveCheckin(autoCheckin);
-        setCheckin(autoCheckin);
-      }
-      setLoading(false);
-    }).catch(() => setLoading(false));
+        const swimMeters = Math.round(health.swim_meters || 0);
+
+        fetch(`${API}/health-data/workouts/today`)
+          .then(r => r.json())
+          .then(workoutsData => {
+            const workouts = workoutsData.workouts || [];
+            const swimWorkout = workouts.find(w =>
+              w.workout_type?.toLowerCase().includes('swim') ||
+              w.workout_type?.toLowerCase().includes('pool')
+            );
+            const swimMinutes = swimWorkout ? Math.round(swimWorkout.duration_min) : 22;
+
+            const autoCheckin = {
+              sleep: health.sleep_hours || 7,
+              feeling: 'bem',
+              finger: 'a recuperar',
+              swam: swimMeters > 0,
+              swimMeters,
+              swimMinutes,
+              hasBJJ: health.has_bjj === 1,
+              notes: '',
+              fromHealth: true,
+            };
+            saveCheckin(autoCheckin);
+            setCheckin(autoCheckin);
+          })
+          .catch(() => {
+            const autoCheckin = {
+              sleep: health.sleep_hours || 7,
+              feeling: 'bem',
+              finger: 'a recuperar',
+              swam: swimMeters > 0,
+              swimMeters,
+              swimMinutes: 22,
+              hasBJJ: health.has_bjj === 1,
+              notes: '',
+              fromHealth: true,
+            };
+            saveCheckin(autoCheckin);
+            setCheckin(autoCheckin);
+          })
+          .finally(() => setLoading(false));
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   return (
