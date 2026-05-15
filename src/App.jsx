@@ -6,7 +6,7 @@ import { saveCheckin, getTodayCheckin, getMissedDays } from './lib/store';
 import { decideWorkout } from './lib/engine';
 import './App.css';
 
-const API = 'https://coach-tiago-api.onrender.com';
+const API = 'https://coach-tiago-api-production.up.railway.app';
 
 export default function App() {
   const [tab, setTab] = useState('hoje');

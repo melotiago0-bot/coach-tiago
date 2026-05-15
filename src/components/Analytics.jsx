@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getRecentCheckins, getSwimHistory, getWeeklySummaries, getMonthlySummaries, getYearlySummaries } from '../lib/store';
 import { getDaysToRace, getPlanProgress, getSwimPlan } from '../lib/engine';
 
-const API = 'https://coach-tiago-api.onrender.com';
+const API = 'https://coach-tiago-api-production.up.railway.app';
 
 function MiniChart({ data, color = '#1D9E75' }) {
   if (!data.length) return <div className="mini-chart-empty">sem dados</div>;
