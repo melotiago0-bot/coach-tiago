@@ -32,8 +32,40 @@ function ExerciseItem({ ex, fingerState }) {
   );
 }
 
+function LiveMetrics({ liveHealth }) {
+  if (!liveHealth) return null;
+  return (
+    <div className="card" style={{ marginBottom: '0.75rem' }}>
+      <div className="card-label">hoje · {liveHealth.date}</div>
+      <div className="grid2">
+        <div className="metric-card">
+          <div className="metric-label">sono</div>
+          <div className="metric-value" style={{ color: '#7F77DD' }}>{liveHealth.sleep_hours?.toFixed(1) || '—'}h</div>
+        </div>
+        <div className="metric-card">
+          <div className="metric-label">hrv</div>
+          <div className="metric-value" style={{ color: '#1D9E75' }}>{liveHealth.hrv ? `${Math.round(liveHealth.hrv)}ms` : '—'}</div>
+        </div>
+        <div className="metric-card">
+          <div className="metric-label">fc repouso</div>
+          <div className="metric-value" style={{ color: '#D85A30' }}>{liveHealth.resting_hr ? `${Math.round(liveHealth.resting_hr)}bpm` : '—'}</div>
+        </div>
+        <div className="metric-card">
+          <div className="metric-label">calorias</div>
+          <div className="metric-value" style={{ color: '#EF9F27' }}>{liveHealth.active_calories ? `${Math.round(liveHealth.active_calories)}` : '—'}</div>
+        </div>
+      </div>
+      {liveHealth.ts && (
+        <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>
+          última sync: {new Date(liveHealth.ts * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SwimAnalysis({ checkin }) {
-  if (!checkin.swam) return null;
+  if (!checkin?.swam || !checkin.swimMeters) return null;
   const analysis = getSwimAnalysis(checkin.swimMeters, checkin.swimMinutes);
   if (!analysis) return null;
   const weekPlan = getCurrentWeekPlan();
@@ -59,30 +91,38 @@ function SwimAnalysis({ checkin }) {
   );
 }
 
-export default function WorkoutDay({ checkin, workout }) {
+export default function WorkoutDay({ checkin, workout, liveHealth }) {
   const [done, setDone] = useState(false);
   const [notes, setNotes] = useState('');
-  if (!checkin) return <div className="card center"><p>faz o check-in primeiro para ver o treino de hoje.</p></div>;
+
+  if (!checkin || !workout) return (
+    <div className="card center"><p>a carregar treino...</p></div>
+  );
+
   if (workout.type === 'none') return (
     <div>
-      <SwimAnalysis checkin={checkin} />
+      <LiveMetrics liveHealth={liveHealth} />
       <div className="card alert-box"><p>menos de 4h de sono — hoje é só uma caminhada leve de 10 minutos. recupera bem.</p></div>
     </div>
   );
+
   const template = templates[workout.type];
   if (!template) return null;
+
   function handleDone() {
     saveWorkoutDone({ type: workout.type, notes, swimMeters: checkin.swimMeters });
     setDone(true);
   }
+
   return (
     <div className="workout-day">
+      <LiveMetrics liveHealth={liveHealth} />
       <SwimAnalysis checkin={checkin} />
       <div className="card">
         <div className="card-label">treino da tarde · {template.name} · {template.duration} min</div>
         <div className="workout-meta">
-          <span className="badge badge-info">sono {checkin.sleep}h</span>
-          {checkin.finger !== 'sem dor' && <span className="badge badge-warn">dedo {checkin.finger}</span>}
+          <span className="badge badge-info">sono {checkin.sleep?.toFixed(1)}h</span>
+          {checkin.hasBJJ && <span className="badge badge-warn">dia de BJJ</span>}
           <span className="badge badge-muted">{workout.reason}</span>
         </div>
         {template.blocks.map((block, i) => (
