@@ -17,48 +17,34 @@ export default function App() {
   const missedDays = getMissedDays();
 
   useEffect(() => {
-    Promise.all([
-      fetch(`${API}/health-data/latest`).then(r => r.json()),
-      fetch(`${API}/health-data/workouts/today`).then(r => r.json()),
-    ]).then(([health, workoutsData]) => {
-      if (health.date) {
-        setLiveHealth(health);
-
-        const workouts = workoutsData.workouts || [];
-        const swimWorkout = workouts.find(w =>
-          w.workout_type?.toLowerCase().includes('swim') ||
-          w.workout_type?.toLowerCase().includes('pool') ||
-          w.workout_type?.toLowerCase().includes('water')
-        );
-
-        const swimMeters = Math.round(health.swim_meters || 0);
-        const swimMinutes = swimWorkout
-          ? Math.round(swimWorkout.duration_min)
-          : 22;
-
-        const w = decideWorkout({
-          sleep: health.sleep_hours || 7,
-          hasBJJ: health.has_bjj === 1,
-          missedDays,
-        });
-        setWorkout(w);
-
-        const autoCheckin = {
-          sleep: health.sleep_hours || 7,
-          feeling: 'bem',
-          finger: 'a recuperar',
-          swam: swimMeters > 0,
-          swimMeters,
-          swimMinutes,
-          hasBJJ: health.has_bjj === 1,
-          notes: '',
-          fromHealth: true,
-        };
-        saveCheckin(autoCheckin);
-        setCheckin(autoCheckin);
-      }
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    fetch(`${API}/health-data/latest`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.date) {
+          setLiveHealth(d);
+          const w = decideWorkout({
+            sleep: d.sleep_hours || 7,
+            hasBJJ: d.has_bjj === 1,
+            missedDays,
+          });
+          setWorkout(w);
+          const autoCheckin = {
+            sleep: d.sleep_hours || 7,
+            feeling: 'bem',
+            finger: 'a recuperar',
+            swam: d.swim_meters > 0,
+            swimMeters: Math.round(d.swim_meters || 0),
+            swimMinutes: 22,
+            hasBJJ: d.has_bjj === 1,
+            notes: '',
+            fromHealth: true,
+          };
+          saveCheckin(autoCheckin);
+          setCheckin(autoCheckin);
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   return (
