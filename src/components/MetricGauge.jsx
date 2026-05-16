@@ -1,7 +1,7 @@
 export default function MetricGauge({ label, value, unit, segments, badge, badgeColor, context, labelColor }) {
   if (!value) return (
     <div className="metric-card">
-      <div className="metric-label" style={{ color: labelColor }}>{label}</div>
+      <div className="metric-label" style={{ color: labelColor, fontWeight: 500 }}>{label}</div>
       <div className="metric-value">—</div>
     </div>
   );
@@ -20,7 +20,7 @@ export default function MetricGauge({ label, value, unit, segments, badge, badge
   const badgeText = { green: '#085041', amber: '#633806', red: '#501313' }[badgeColor] || '#085041';
   return (
     <div className="metric-card">
-      <div className="metric-label" style={{ color: labelColor }}>{label}</div>
+      <div className="metric-label" style={{ color: labelColor, fontWeight: 500 }}>{label}</div>
       <div style={{ fontSize: '22px', fontWeight: 500, color: 'var(--text)', marginBottom: '6px' }}>
         {typeof value === 'number' ? Math.round(value * 10) / 10 : value}
         <span style={{ fontSize: '13px', fontWeight: 400, color: 'var(--text2)' }}>{unit}</span>

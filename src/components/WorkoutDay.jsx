@@ -4,6 +4,18 @@ import { getSwimAnalysis, getDaysToRace, getCurrentWeekPlan } from '../lib/engin
 import { templates } from '../lib/exercises';
 import MetricGauge, { HRV_CONFIG, RHR_CONFIG, SLEEP_CONFIG } from './MetricGauge';
 
+function SimpleMetric({ label, value, unit, sub, color }) {
+  return (
+    <div className="metric-card">
+      <div className="metric-label" style={{ color, fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: '22px', fontWeight: 500, color: 'var(--text)', marginBottom: '4px' }}>
+        {value}<span style={{ fontSize: '13px', fontWeight: 400, color: 'var(--text2)' }}>{unit}</span>
+      </div>
+      {sub && <div style={{ fontSize: '11px', color: 'var(--text2)' }}>{sub}</div>}
+    </div>
+  );
+}
+
 function ExerciseItem({ ex, fingerState }) {
   const [open, setOpen] = useState(false);
   const needsFingerMod = fingerState !== 'sem dor' && ex.fingerMod;
@@ -64,16 +76,9 @@ function LiveMetrics({ liveHealth }) {
         {liveHealth.sleep_hours && <MetricGauge label="sono" value={liveHealth.sleep_hours} unit="h" {...SLEEP_CONFIG(liveHealth.sleep_hours)} />}
         {liveHealth.hrv && <MetricGauge label="hrv" value={liveHealth.hrv} unit="ms" {...HRV_CONFIG(liveHealth.hrv)} />}
         {liveHealth.resting_hr && <MetricGauge label="fc repouso" value={liveHealth.resting_hr} unit="bpm" {...RHR_CONFIG(liveHealth.resting_hr)} />}
-        <div className="metric-card">
-          <div className="metric-label">calorias</div>
-          <div style={{ fontSize: '22px', fontWeight: 500 }}>{liveHealth.active_calories ? Math.round(liveHealth.active_calories) : '—'}<span style={{ fontSize: '13px', fontWeight: 400, color: 'var(--text2)' }}>kcal</span></div>
-          <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '4px' }}>ativas hoje</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">passos</div>
-          <div style={{ fontSize: '22px', fontWeight: 500 }}>{liveHealth.steps ? Math.round(liveHealth.steps).toLocaleString() : '—'}</div>
-          <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '4px' }}>meta 10 000</div>
-        </div>
+        <SimpleMetric label="calorias" value={liveHealth.active_calories ? Math.round(liveHealth.active_calories) : '—'} unit="kcal" sub="ativas hoje" color="#EF9F27" />
+        <SimpleMetric label="passos" value={liveHealth.steps ? Math.round(liveHealth.steps).toLocaleString() : '—'} sub="meta 10 000" color="#378ADD" />
+        {liveHealth.swim_meters > 0 && <SimpleMetric label="natação" value={Math.round(liveHealth.swim_meters)} unit="m" color="#1D9E75" />}
       </div>
     </div>
   );
