@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { saveWorkoutDone } from '../lib/store';
 import { getSwimAnalysis, getDaysToRace, getCurrentWeekPlan } from '../lib/engine';
 import { templates } from '../lib/exercises';
+import MetricGauge, { HRV_CONFIG, RHR_CONFIG, SLEEP_CONFIG } from './MetricGauge';
 
 function ExerciseItem({ ex, fingerState }) {
   const [open, setOpen] = useState(false);
@@ -26,38 +27,6 @@ function ExerciseItem({ ex, fingerState }) {
             {ex.easier && <span className="ex-mod easier">mais fácil: {ex.easier}</span>}
             {ex.harder && <span className="ex-mod harder">mais difícil: {ex.harder}</span>}
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function LiveMetrics({ liveHealth }) {
-  if (!liveHealth) return null;
-  return (
-    <div className="card" style={{ marginBottom: '0.75rem' }}>
-      <div className="card-label">hoje · {liveHealth.date}</div>
-      <div className="grid2">
-        <div className="metric-card">
-          <div className="metric-label">sono</div>
-          <div className="metric-value" style={{ color: '#7F77DD' }}>{liveHealth.sleep_hours?.toFixed(1) || '—'}h</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">hrv</div>
-          <div className="metric-value" style={{ color: '#1D9E75' }}>{liveHealth.hrv ? `${Math.round(liveHealth.hrv)}ms` : '—'}</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">fc repouso</div>
-          <div className="metric-value" style={{ color: '#D85A30' }}>{liveHealth.resting_hr ? `${Math.round(liveHealth.resting_hr)}bpm` : '—'}</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">calorias</div>
-          <div className="metric-value" style={{ color: '#EF9F27' }}>{liveHealth.active_calories ? `${Math.round(liveHealth.active_calories)}` : '—'}</div>
-        </div>
-      </div>
-      {liveHealth.ts && (
-        <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>
-          última sync: {new Date(liveHealth.ts * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
         </div>
       )}
     </div>
@@ -91,18 +60,49 @@ function SwimAnalysis({ checkin }) {
   );
 }
 
+function LiveMetrics({ liveHealth }) {
+  if (!liveHealth) return null;
+  const hrv = liveHealth.hrv;
+  const rhr = liveHealth.resting_hr;
+  const sleep = liveHealth.sleep_hours;
+  return (
+    <div className="card" style={{ marginBottom: '0.75rem' }}>
+      <div className="card-label">hoje · {liveHealth.date} · sync {new Date(liveHealth.ts * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</div>
+      <div className="grid2">
+        {sleep && <MetricGauge label="sono" value={sleep} unit="h" {...SLEEP_CONFIG(sleep)} />}
+        {hrv && <MetricGauge label="hrv" value={hrv} unit="ms" {...HRV_CONFIG(hrv)} />}
+        {rhr && <MetricGauge label="fc repouso" value={rhr} unit="bpm" {...RHR_CONFIG(rhr)} />}
+        <div className="metric-card">
+          <div className="metric-label">calorias</div>
+          <div style={{ fontSize: '22px', fontWeight: 500 }}>{liveHealth.active_calories ? Math.round(liveHealth.active_calories) : '—'}<span style={{ fontSize: '13px', fontWeight: 400, color: 'var(--text2)' }}>kcal</span></div>
+          <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '4px' }}>ativas hoje</div>
+        </div>
+        <div className="metric-card">
+          <div className="metric-label">passos</div>
+          <div style={{ fontSize: '22px', fontWeight: 500 }}>{liveHealth.steps ? Math.round(liveHealth.steps).toLocaleString() : '—'}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '4px' }}>meta 10 000</div>
+        </div>
+        {liveHealth.swim_meters > 0 && (
+          <div className="metric-card">
+            <div className="metric-label">natação</div>
+            <div style={{ fontSize: '22px', fontWeight: 500 }}>{Math.round(liveHealth.swim_meters)}<span style={{ fontSize: '13px', fontWeight: 400, color: 'var(--text2)' }}>m</span></div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function WorkoutDay({ checkin, workout, liveHealth }) {
   const [done, setDone] = useState(false);
   const [notes, setNotes] = useState('');
 
-  if (!checkin || !workout) return (
-    <div className="card center"><p>a carregar treino...</p></div>
-  );
+  if (!checkin || !workout) return <div className="card center"><p>a carregar dados...</p></div>;
 
   if (workout.type === 'none') return (
     <div>
       <LiveMetrics liveHealth={liveHealth} />
-      <div className="card alert-box"><p>menos de 4h de sono — hoje é só uma caminhada leve de 10 minutos. recupera bem.</p></div>
+      <div className="card alert-box"><p>menos de 4h de sono — hoje é só uma caminhada leve de 10 minutos.</p></div>
     </div>
   );
 
