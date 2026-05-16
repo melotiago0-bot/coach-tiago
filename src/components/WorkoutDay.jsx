@@ -12,10 +12,7 @@ function ExerciseItem({ ex, fingerState }) {
   return (
     <div className="exercise-item">
       <div className="ex-header" onClick={() => setOpen(!open)}>
-        <div>
-          <div className="ex-title">{ex.name}</div>
-          <div className="ex-meta">{sets} × {repsLabel}</div>
-        </div>
+        <div><div className="ex-title">{ex.name}</div><div className="ex-meta">{sets} × {repsLabel}</div></div>
         <span className={`chevron ${open ? 'open' : ''}`}>›</span>
       </div>
       {open && (
@@ -52,9 +49,7 @@ function SwimAnalysis({ checkin }) {
         <div className="swim-stat"><span>projeção 5km</span><strong>{analysis.proj5kMin}h{String(analysis.proj5kSec).padStart(2,'0')}</strong></div>
         <div className="swim-stat"><span>meta diária</span><strong>{weekPlan.daily}m</strong></div>
       </div>
-      <div className="bar-track">
-        <div className="bar-fill" style={{ width: `${Math.min(100, Math.round((checkin.swimMeters / weekPlan.daily) * 100))}%` }} />
-      </div>
+      <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.min(100, Math.round((checkin.swimMeters / weekPlan.daily) * 100))}%` }} /></div>
       <div className="swim-hint">{daysToRace} dias para a prova · foco em volume, não velocidade</div>
     </div>
   );
@@ -62,16 +57,13 @@ function SwimAnalysis({ checkin }) {
 
 function LiveMetrics({ liveHealth }) {
   if (!liveHealth) return null;
-  const hrv = liveHealth.hrv;
-  const rhr = liveHealth.resting_hr;
-  const sleep = liveHealth.sleep_hours;
   return (
     <div className="card" style={{ marginBottom: '0.75rem' }}>
       <div className="card-label">hoje · {liveHealth.date} · sync {new Date(liveHealth.ts * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</div>
       <div className="grid2">
-        {sleep && <MetricGauge label="sono" value={sleep} unit="h" {...SLEEP_CONFIG(sleep)} />}
-        {hrv && <MetricGauge label="hrv" value={hrv} unit="ms" {...HRV_CONFIG(hrv)} />}
-        {rhr && <MetricGauge label="fc repouso" value={rhr} unit="bpm" {...RHR_CONFIG(rhr)} />}
+        {liveHealth.sleep_hours && <MetricGauge label="sono" value={liveHealth.sleep_hours} unit="h" {...SLEEP_CONFIG(liveHealth.sleep_hours)} />}
+        {liveHealth.hrv && <MetricGauge label="hrv" value={liveHealth.hrv} unit="ms" {...HRV_CONFIG(liveHealth.hrv)} />}
+        {liveHealth.resting_hr && <MetricGauge label="fc repouso" value={liveHealth.resting_hr} unit="bpm" {...RHR_CONFIG(liveHealth.resting_hr)} />}
         <div className="metric-card">
           <div className="metric-label">calorias</div>
           <div style={{ fontSize: '22px', fontWeight: 500 }}>{liveHealth.active_calories ? Math.round(liveHealth.active_calories) : '—'}<span style={{ fontSize: '13px', fontWeight: 400, color: 'var(--text2)' }}>kcal</span></div>
@@ -82,12 +74,6 @@ function LiveMetrics({ liveHealth }) {
           <div style={{ fontSize: '22px', fontWeight: 500 }}>{liveHealth.steps ? Math.round(liveHealth.steps).toLocaleString() : '—'}</div>
           <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '4px' }}>meta 10 000</div>
         </div>
-        {liveHealth.swim_meters > 0 && (
-          <div className="metric-card">
-            <div className="metric-label">natação</div>
-            <div style={{ fontSize: '22px', fontWeight: 500 }}>{Math.round(liveHealth.swim_meters)}<span style={{ fontSize: '13px', fontWeight: 400, color: 'var(--text2)' }}>m</span></div>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -96,24 +82,16 @@ function LiveMetrics({ liveHealth }) {
 export default function WorkoutDay({ checkin, workout, liveHealth }) {
   const [done, setDone] = useState(false);
   const [notes, setNotes] = useState('');
-
   if (!checkin || !workout) return <div className="card center"><p>a carregar dados...</p></div>;
-
   if (workout.type === 'none') return (
-    <div>
-      <LiveMetrics liveHealth={liveHealth} />
-      <div className="card alert-box"><p>menos de 4h de sono — hoje é só uma caminhada leve de 10 minutos.</p></div>
-    </div>
+    <div><LiveMetrics liveHealth={liveHealth} /><div className="card alert-box"><p>menos de 4h de sono — hoje é só caminhada leve.</p></div></div>
   );
-
   const template = templates[workout.type];
   if (!template) return null;
-
   function handleDone() {
     saveWorkoutDone({ type: workout.type, notes, swimMeters: checkin.swimMeters });
     setDone(true);
   }
-
   return (
     <div className="workout-day">
       <LiveMetrics liveHealth={liveHealth} />
@@ -136,9 +114,7 @@ export default function WorkoutDay({ checkin, workout, liveHealth }) {
             <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="notas do treino (opcional)..." rows={2} />
             <button className="btn-primary" onClick={handleDone}>marcar como feito</button>
           </div>
-        ) : (
-          <div className="done-confirm">treino registado</div>
-        )}
+        ) : <div className="done-confirm">treino registado</div>}
       </div>
     </div>
   );
