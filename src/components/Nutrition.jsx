@@ -1,19 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
 
 const API = 'https://coach-tiago-api-production.up.railway.app';
+const BASAL = 1906;
 const CALORIE_GOAL = 2300;
 const PROTEIN_GOAL = 160;
 const FAT_GOAL = 90;
 const FIBER_GOAL = 25;
+const IRON_GOAL = 8;
+const MAGNESIUM_GOAL = 400;
+const ZINC_GOAL = 11;
+const POTASSIUM_GOAL = 3500;
+const B12_GOAL = 2.4;
+const VITAMIN_D_GOAL = 600;
 
-function MacroBar({ label, current, goal, color }) {
+function MacroBar({ label, current, goal, color, unit = 'g' }) {
   const pct = Math.min(100, Math.round((current / goal) * 100));
   const ok = pct >= 80;
   return (
     <div className="metric-card">
       <div className="metric-label" style={{ color, fontWeight: 500 }}>{label}</div>
       <div style={{ fontSize: '20px', fontWeight: 500, color: 'var(--text)' }}>
-        {Math.round(current)}<span style={{ fontSize: '12px', color: 'var(--text2)' }}>/{goal}</span>
+        {typeof current === 'number' && current < 10 ? current.toFixed(1) : Math.round(current)}
+        <span style={{ fontSize: '12px', color: 'var(--text2)' }}>/{goal}{unit}</span>
       </div>
       <div style={{ height: '5px', background: 'var(--bg3)', borderRadius: '4px', marginTop: '6px', overflow: 'hidden' }}>
         <div style={{ height: '5px', borderRadius: '4px', width: `${pct}%`, background: ok ? color : '#EF9F27' }} />
@@ -23,12 +31,12 @@ function MacroBar({ label, current, goal, color }) {
   );
 }
 
-function MealCard({ meal, onDelete }) {
+function MealCard({ meal }) {
   const time = new Date(meal.ts * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
   return (
     <div style={{ padding: '10px 0', borderBottom: '0.5px solid var(--border)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
+        <div style={{ flex: 1 }}>
           <div style={{ fontSize: '13px', fontWeight: 500 }}>{meal.meal_type} · {time}</div>
           <div style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '2px' }}>{meal.description}</div>
           <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
@@ -59,9 +67,7 @@ export default function Nutrition() {
   const [mealType, setMealType] = useState('almoço');
   const fileRef = useRef();
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   async function loadData() {
     const [mealsRes, healthRes] = await Promise.all([
@@ -77,28 +83,34 @@ export default function Nutrition() {
   const totalFat = meals.reduce((s, m) => s + (m.fat || 0), 0);
   const totalFiber = meals.reduce((s, m) => s + (m.fiber || 0), 0);
   const totalCarbs = meals.reduce((s, m) => s + (m.carbs || 0), 0);
+  const totalIron = meals.reduce((s, m) => s + (m.iron || 0), 0);
+  const totalMagnesium = meals.reduce((s, m) => s + (m.magnesium || 0), 0);
+  const totalZinc = meals.reduce((s, m) => s + (m.zinc || 0), 0);
+  const totalPotassium = meals.reduce((s, m) => s + (m.potassium || 0), 0);
+  const totalB12 = meals.reduce((s, m) => s + (m.b12 || 0), 0);
+  const totalVitD = meals.reduce((s, m) => s + (m.vitamin_d || 0), 0);
 
-  const burned = healthData?.active_calories || 0;
-  const basal = 1950;
-  const totalBurned = burned + basal;
+  const activeCals = healthData?.active_calories || 0;
+  const totalBurned = BASAL + activeCals;
   const deficit = totalBurned - totalCals;
   const remaining = CALORIE_GOAL - totalCals;
 
   const lastMeal = meals.length ? meals[meals.length - 1] : null;
-  const fastingHours = lastMeal ? Math.round((Date.now() - lastMeal.ts * 1000) / 3600000 * 10) / 10 : null;
+  const fastingHours = lastMeal ? Math.round((Date.now() - lastMeal.ts * 1000) / 360000) / 10 : null;
   const nextWindow = lastMeal ? new Date((lastMeal.ts + 57600) * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : null;
+
+  const deficitColor = deficit < 300 ? '#D85A30' : deficit > 800 ? '#EF9F27' : '#1D9E75';
+  const deficitLabel = deficit < 300 ? 'défice insuficiente' : deficit > 800 ? 'défice elevado' : 'zona ideal';
 
   async function handlePhoto(e) {
     const file = e.target.files[0];
     if (!file) return;
-    setAnalyzing(true);
-    setShowAdd(false);
+    setAnalyzing(true); setShowAdd(false);
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const b64 = ev.target.result.split(',')[1];
       const res = await fetch(`${API}/meals/analyze-photo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: b64, meal_type: mealType })
       }).then(r => r.json());
       setAnalyzing(false);
@@ -109,41 +121,29 @@ export default function Nutrition() {
 
   async function handleText() {
     if (!textInput.trim()) return;
-    setAnalyzing(true);
-    setShowAdd(false);
+    setAnalyzing(true); setShowAdd(false);
     const res = await fetch(`${API}/meals/analyze-text`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: textInput, meal_type: mealType })
     }).then(r => r.json());
-    setAnalyzing(false);
-    setTextInput('');
+    setAnalyzing(false); setTextInput('');
     if (res.status === 'ok') setPending({ ...res.analysis, meal_type: mealType });
   }
 
   async function confirmMeal() {
     await fetch(`${API}/meals`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(pending)
     });
     setPending(null);
-    loadData();
-    analyzeDeficits();
-  }
-
-  async function analyzeDeficits() {
-    const totals = { calories: totalCals, protein: totalProtein, fat: totalFat, fiber: totalFiber, carbs: totalCarbs };
+    await loadData();
+    const totals = { calories: totalCals + pending.calories, protein: totalProtein + pending.protein, fat: totalFat + pending.fat, fiber: totalFiber + pending.fiber, iron: totalIron + (pending.iron||0), magnesium: totalMagnesium + (pending.magnesium||0), zinc: totalZinc + (pending.zinc||0), potassium: totalPotassium + (pending.potassium||0), b12: totalB12 + (pending.b12||0), vitamin_d: totalVitD + (pending.vitamin_d||0) };
     const res = await fetch(`${API}/meals/deficits`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ meals, totals })
     }).then(r => r.json());
     setDeficits(res);
   }
-
-  const deficitColor = deficit < 300 ? '#D85A30' : deficit > 800 ? '#EF9F27' : '#1D9E75';
-  const deficitLabel = deficit < 300 ? 'défice insuficiente' : deficit > 800 ? 'défice elevado' : 'zona ideal';
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
@@ -159,8 +159,8 @@ export default function Nutrition() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div>
                 <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>défice calórico</div>
-                <div style={{ fontSize: '32px', fontWeight: 500, color: deficitColor }}>{deficit > 0 ? '-' : '+'}{Math.abs(Math.round(deficit))} <span style={{ fontSize: '16px', fontWeight: 400, color: 'var(--text2)' }}>kcal</span></div>
-                <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '2px' }}>{deficitLabel}</div>
+                <div style={{ fontSize: '32px', fontWeight: 500, color: deficitColor }}>{deficit >= 0 ? '-' : '+'}{Math.abs(Math.round(deficit))} <span style={{ fontSize: '16px', fontWeight: 400, color: 'var(--text2)' }}>kcal</span></div>
+                <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '2px' }}>{deficitLabel} · objetivo -500 a -700</div>
               </div>
               <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: deficit >= 300 && deficit <= 800 ? '#E1F5EE' : '#FAEEDA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
                 {deficit >= 300 && deficit <= 800 ? '✓' : '⚠'}
@@ -170,7 +170,7 @@ export default function Nutrition() {
               <div style={{ flex: 1, textAlign: 'center' }}>
                 <div style={{ fontSize: '11px', color: '#D85A30', fontWeight: 500 }}>gastas</div>
                 <div style={{ fontSize: '18px', fontWeight: 500 }}>{Math.round(totalBurned)}</div>
-                <div style={{ fontSize: '10px', color: 'var(--text3)' }}>kcal</div>
+                <div style={{ fontSize: '10px', color: 'var(--text3)' }}>basal {BASAL} + ativas {Math.round(activeCals)}</div>
               </div>
               <div style={{ fontSize: '20px', color: 'var(--text3)', alignSelf: 'center' }}>−</div>
               <div style={{ flex: 1, textAlign: 'center' }}>
@@ -218,52 +218,51 @@ export default function Nutrition() {
             </div>
           </div>
 
+          <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '1rem 0 .5rem' }}>minerais e vitaminas</div>
+          <div className="grid2">
+            <MacroBar label="ferro" current={totalIron} goal={IRON_GOAL} color="#7F77DD" unit="mg" />
+            <MacroBar label="magnésio" current={totalMagnesium} goal={MAGNESIUM_GOAL} color="#1D9E75" unit="mg" />
+            <MacroBar label="zinco" current={totalZinc} goal={ZINC_GOAL} color="#378ADD" unit="mg" />
+            <MacroBar label="potássio" current={totalPotassium} goal={POTASSIUM_GOAL} color="#EF9F27" unit="mg" />
+            <MacroBar label="vitamina B12" current={totalB12} goal={B12_GOAL} color="#D85A30" unit="mcg" />
+            <MacroBar label="vitamina D" current={totalVitD} goal={VITAMIN_D_GOAL} color="#5DCAA5" unit="IU" />
+          </div>
+
           {deficits && deficits.deficits && deficits.deficits.length > 0 && (
             <>
-              <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '1rem 0 .5rem' }}>défices · sugestões</div>
+              <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '1rem 0 .5rem' }}>sugestões para défices</div>
               {deficits.deficits.map((d, i) => (
                 <div key={i} className="card" style={{ padding: '.75rem 1rem', marginBottom: '.5rem' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 500, color: '#EF9F27', marginBottom: '4px' }}>
-                    {d.nutrient} — {Math.round(d.current)}/{d.target} {d.unit || 'g'}
-                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: 500, color: '#EF9F27', marginBottom: '6px' }}>{d.nutrient} — {Math.round(d.current)}/{d.target}{d.unit || 'g'}</div>
                   {d.suggestions.map((s, j) => (
-                    <div key={j} style={{ fontSize: '12px', color: 'var(--text2)', padding: '3px 0' }}>
-                      · {s.food} ({s.amount}) → +{s.value}{s.unit}
-                    </div>
+                    <div key={j} style={{ fontSize: '12px', color: 'var(--text2)', padding: '3px 0' }}>· {s.food} ({s.amount}) → +{s.value}{s.unit}</div>
                   ))}
                 </div>
               ))}
-              {deficits.overall && (
-                <div style={{ background: '#E1F5EE', borderRadius: 'var(--border-radius-md)', padding: '.6rem .9rem', fontSize: '12px', color: '#085041', marginBottom: '.75rem', lineHeight: 1.5 }}>
-                  {deficits.overall}
-                </div>
-              )}
+              {deficits.overall && <div style={{ background: '#E1F5EE', borderRadius: 'var(--border-radius-md)', padding: '.6rem .9rem', fontSize: '12px', color: '#085041', marginBottom: '.75rem', lineHeight: 1.5 }}>{deficits.overall}</div>}
             </>
           )}
 
-          <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '1rem 0 .5rem' }}>refeições</div>
+          <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '1rem 0 .5rem' }}>refeições de hoje</div>
           <div className="card">
-            {meals.length === 0 ? <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '1rem 0' }}>ainda sem refeições hoje</div>
+            {meals.length === 0
+              ? <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '1rem 0' }}>ainda sem refeições hoje</div>
               : meals.map((m, i) => <MealCard key={i} meal={m} />)}
           </div>
 
-          {analyzing && (
-            <div className="card" style={{ textAlign: 'center', padding: '1.5rem' }}>
-              <div style={{ fontSize: '13px', color: 'var(--text2)' }}>a analisar com Claude...</div>
-            </div>
-          )}
+          {analyzing && <div className="card" style={{ textAlign: 'center', padding: '1.5rem' }}><div style={{ fontSize: '13px', color: 'var(--text2)' }}>a analisar com Claude...</div></div>}
 
           {pending && (
             <div className="card">
               <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>Confirma a refeição</div>
               <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '8px' }}>{pending.description}</div>
+              {pending.items && <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>Identificado: {pending.items.join(', ')}</div>}
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
                 <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: 'var(--bg3)' }}>{Math.round(pending.calories)} kcal</span>
                 <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: '#FAECE7', color: '#712B13' }}>P {Math.round(pending.protein)}g</span>
                 <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: '#FAEEDA', color: '#633806' }}>G {Math.round(pending.fat)}g</span>
                 <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: '#E6F1FB', color: '#0C447C' }}>F {Math.round(pending.fiber)}g</span>
               </div>
-              {pending.items && <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '12px' }}>Identificado: {pending.items.join(', ')}</div>}
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button className="btn-primary" style={{ flex: 1 }} onClick={confirmMeal}>confirmar</button>
                 <button style={{ flex: 1, padding: '12px', border: '0.5px solid var(--border2)', borderRadius: 'var(--border-radius-md)', background: 'var(--bg)', color: 'var(--text)', fontSize: '14px', cursor: 'pointer' }} onClick={() => setPending(null)}>cancelar</button>
@@ -295,7 +294,7 @@ export default function Nutrition() {
                 </>
               ) : (
                 <>
-                  <textarea value={textInput} onChange={e => setTextInput(e.target.value)} placeholder="ex: bife de 200g com espinafres e azeite..." rows={3} style={{ width: '100%', background: 'var(--bg3)', border: '0.5px solid var(--border)', borderRadius: 'var(--border-radius-md)', color: 'var(--text)', fontSize: '13px', padding: '8px 10px', resize: 'none', fontFamily: 'inherit', lineHeight: 1.5, marginBottom: '8px' }} />
+                  <textarea value={textInput} onChange={e => setTextInput(e.target.value)} placeholder="ex: bife 200g com espinafres e azeite..." rows={3} style={{ width: '100%', background: 'var(--bg3)', border: '0.5px solid var(--border)', borderRadius: 'var(--border-radius-md)', color: 'var(--text)', fontSize: '13px', padding: '8px 10px', resize: 'none', fontFamily: 'inherit', lineHeight: 1.5, marginBottom: '8px' }} />
                   <button className="btn-primary" onClick={handleText}>analisar</button>
                 </>
               )}
