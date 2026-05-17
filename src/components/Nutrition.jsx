@@ -93,7 +93,7 @@ export default function Nutrition() {
   const activeCals = healthData?.active_calories || 0;
   const totalBurned = BASAL + activeCals;
   const deficit = totalBurned - totalCals;
-  const remaining = CALORIE_GOAL - totalCals;
+  
 
   const lastMeal = meals.length ? meals[meals.length - 1] : null;
   const fastingHours = lastMeal ? Math.round((Date.now() - lastMeal.ts * 1000) / 360000) / 10 : null;
@@ -178,14 +178,7 @@ export default function Nutrition() {
                 <div style={{ fontSize: '18px', fontWeight: 500 }}>{Math.round(totalCals)}</div>
                 <div style={{ fontSize: '10px', color: 'var(--text3)' }}>kcal</div>
               </div>
-              <div style={{ fontSize: '20px', color: 'var(--text3)', alignSelf: 'center' }}>=</div>
-              <div style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: '#7F77DD', fontWeight: 500 }}>disponível</div>
-                <div style={{ fontSize: '18px', fontWeight: 500, color: remaining < 0 ? '#D85A30' : 'var(--text)' }}>{Math.max(0, Math.round(remaining))}</div>
-                <div style={{ fontSize: '10px', color: 'var(--text3)' }}>kcal</div>
-              </div>
             </div>
-            {remaining < 0 && <div style={{ background: '#FCEBEB', borderRadius: 'var(--border-radius-md)', padding: '.5rem .75rem', fontSize: '12px', color: '#501313' }}>Já atingiste o objetivo calórico de hoje.</div>}
           </div>
 
           {lastMeal && (
