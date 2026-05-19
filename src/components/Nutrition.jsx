@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import FastingCard from './FastingCard';
+import NutritionAnalytics from './NutritionAnalytics';
 
 const API = 'https://coach-tiago-api-production.up.railway.app';
 const BASAL = 1906;
@@ -305,13 +306,7 @@ export default function Nutrition() {
       </>
       )}
 
-      {tab === 'analytics' && (
-        <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text2)' }}>
-          <div style={{ fontSize: '32px', marginBottom: '8px' }}>📊</div>
-          <div style={{ fontSize: '14px' }}>analytics de nutrição em breve</div>
-          <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>os dados vão acumulando com cada refeição registada</div>
-        </div>
-      )}
+      {tab === 'analytics' && <NutritionAnalytics />}
     </div>
   );
 }
