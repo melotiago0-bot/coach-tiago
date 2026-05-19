@@ -303,9 +303,6 @@ export default function Nutrition() {
         </>
       )}
 
-      </>
-      )}
-
       {tab === 'analytics' && <NutritionAnalytics />}
     </div>
   );
