@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import FastingCard from './FastingCard';
 
 const API = 'https://coach-tiago-api-production.up.railway.app';
 const BASAL = 1906;
@@ -155,6 +156,10 @@ export default function Nutrition() {
 
       {tab === 'hoje' && (
         <>
+          <FastingCard />
+        <>
+          <FastingCard />
+        <>
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div>
@@ -295,6 +300,9 @@ export default function Nutrition() {
             </div>
           )}
         </>
+      )}
+
+      </>
       )}
 
       {tab === 'analytics' && (
