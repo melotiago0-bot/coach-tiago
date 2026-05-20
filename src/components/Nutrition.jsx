@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import FastingCard from './FastingCard';
 import NutritionAnalytics from './NutritionAnalytics';
 
-const API = 'https://coach-tiago-api-production.up.railway.app';
+import { apiFetch } from '../lib/config';
+
 const BASAL = 1906;
-const CALORIE_GOAL = 2300;
 const PROTEIN_GOAL = 160;
 const FAT_GOAL = 90;
 const FIBER_GOAL = 25;
@@ -56,12 +56,13 @@ function MealCard({ meal }) {
   );
 }
 
-export default function Nutrition() {
+export default function Nutrition({ liveHealth }) {
   const [tab, setTab] = useState('hoje');
   const [meals, setMeals] = useState([]);
-  const [healthData, setHealthData] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [pending, setPending] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editFields, setEditFields] = useState({});
   const [deficits, setDeficits] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [addMode, setAddMode] = useState('text');
@@ -72,12 +73,8 @@ export default function Nutrition() {
   useEffect(() => { loadData(); }, []);
 
   async function loadData() {
-    const [mealsRes, healthRes] = await Promise.all([
-      fetch(`${API}/meals/today`).then(r => r.json()).catch(() => ({ meals: [] })),
-      fetch(`${API}/health-data/latest`).then(r => r.json()).catch(() => null)
-    ]);
+    const mealsRes = await apiFetch('/meals/today').then(r => r.json()).catch(() => ({ meals: [] }));
     setMeals(mealsRes.meals || []);
-    setHealthData(healthRes);
   }
 
   const totalCals = meals.reduce((s, m) => s + (m.calories || 0), 0);
@@ -92,31 +89,45 @@ export default function Nutrition() {
   const totalB12 = meals.reduce((s, m) => s + (m.b12 || 0), 0);
   const totalVitD = meals.reduce((s, m) => s + (m.vitamin_d || 0), 0);
 
-  const activeCals = healthData?.active_calories || 0;
+  const activeCals = liveHealth?.active_calories || 0;
   const totalBurned = BASAL + activeCals;
   const deficit = totalBurned - totalCals;
-  
-
-  const lastMeal = meals.length ? meals[meals.length - 1] : null;
-  const fastingHours = lastMeal ? Math.round((Date.now() - lastMeal.ts * 1000) / 360000) / 10 : null;
-  const nextWindow = lastMeal ? new Date((lastMeal.ts + 57600) * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : null;
 
   const deficitColor = deficit < 300 ? '#D85A30' : deficit > 800 ? '#EF9F27' : '#1D9E75';
   const deficitLabel = deficit < 300 ? 'défice insuficiente' : deficit > 800 ? 'défice elevado' : 'zona ideal';
 
+  const MAX_PHOTO_MB = 5;
+
   async function handlePhoto(e) {
     const file = e.target.files[0];
     if (!file) return;
+    if (file.size > MAX_PHOTO_MB * 1024 * 1024) {
+      alert(`Foto demasiado grande. Máximo ${MAX_PHOTO_MB}MB.`);
+      e.target.value = '';
+      return;
+    }
     setAnalyzing(true); setShowAdd(false);
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const b64 = ev.target.result.split(',')[1];
-      const res = await fetch(`${API}/meals/analyze-photo`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const res = await apiFetch('/meals/analyze-photo', {
+        method: 'POST',
         body: JSON.stringify({ image: b64, meal_type: mealType })
       }).then(r => r.json());
       setAnalyzing(false);
-      if (res.status === 'ok') setPending({ ...res.analysis, meal_type: mealType });
+      if (res.status === 'ok') {
+        const analysis = { ...res.analysis, meal_type: mealType };
+        setPending(analysis);
+        setEditFields({
+          description: analysis.description || '',
+          calories: analysis.calories || 0,
+          protein: analysis.protein || 0,
+          fat: analysis.fat || 0,
+          fiber: analysis.fiber || 0,
+          carbs: analysis.carbs || 0,
+        });
+        setEditMode(false);
+      }
     };
     reader.readAsDataURL(file);
   }
@@ -124,27 +135,66 @@ export default function Nutrition() {
   async function handleText() {
     if (!textInput.trim()) return;
     setAnalyzing(true); setShowAdd(false);
-    const res = await fetch(`${API}/meals/analyze-text`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const res = await apiFetch('/meals/analyze-text', {
+      method: 'POST',
       body: JSON.stringify({ text: textInput, meal_type: mealType })
     }).then(r => r.json());
     setAnalyzing(false); setTextInput('');
-    if (res.status === 'ok') setPending({ ...res.analysis, meal_type: mealType });
+    if (res.status === 'ok') {
+      const analysis = { ...res.analysis, meal_type: mealType };
+      setPending(analysis);
+      setEditFields({
+        description: analysis.description || '',
+        calories: analysis.calories || 0,
+        protein: analysis.protein || 0,
+        fat: analysis.fat || 0,
+        fiber: analysis.fiber || 0,
+        carbs: analysis.carbs || 0,
+      });
+      setEditMode(false);
+    }
   }
 
-  async function confirmMeal() {
-    await fetch(`${API}/meals`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(pending)
-    });
-    setPending(null);
+  async function confirmMeal(mealData = pending) {
+    await apiFetch('/meals', { method: 'POST', body: JSON.stringify(mealData) });
+    setPending(null); setEditMode(false);
     await loadData();
-    const totals = { calories: totalCals + pending.calories, protein: totalProtein + pending.protein, fat: totalFat + pending.fat, fiber: totalFiber + pending.fiber, iron: totalIron + (pending.iron||0), magnesium: totalMagnesium + (pending.magnesium||0), zinc: totalZinc + (pending.zinc||0), potassium: totalPotassium + (pending.potassium||0), b12: totalB12 + (pending.b12||0), vitamin_d: totalVitD + (pending.vitamin_d||0) };
-    const res = await fetch(`${API}/meals/deficits`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const totals = { calories: totalCals + mealData.calories, protein: totalProtein + mealData.protein, fat: totalFat + mealData.fat, fiber: totalFiber + mealData.fiber, iron: totalIron + (mealData.iron||0), magnesium: totalMagnesium + (mealData.magnesium||0), zinc: totalZinc + (mealData.zinc||0), potassium: totalPotassium + (mealData.potassium||0), b12: totalB12 + (mealData.b12||0), vitamin_d: totalVitD + (mealData.vitamin_d||0) };
+    const res = await apiFetch('/meals/deficits', {
+      method: 'POST',
       body: JSON.stringify({ meals, totals })
     }).then(r => r.json());
     setDeficits(res);
+  }
+
+  async function confirmWithCorrection() {
+    const corrected = {
+      ...pending,
+      description: editFields.description,
+      calories: Number(editFields.calories),
+      protein: Number(editFields.protein),
+      fat: Number(editFields.fat),
+      fiber: Number(editFields.fiber),
+      carbs: Number(editFields.carbs),
+    };
+    // guardar feedback para a IA aprender
+    apiFetch('/meals/feedback', {
+      method: 'POST',
+      body: JSON.stringify({
+        meal_type: pending.meal_type,
+        original_description: pending.description,
+        original_calories: pending.calories,
+        original_protein: pending.protein,
+        original_fat: pending.fat,
+        original_fiber: pending.fiber,
+        corrected_description: corrected.description,
+        corrected_calories: corrected.calories,
+        corrected_protein: corrected.protein,
+        corrected_fat: corrected.fat,
+        corrected_fiber: corrected.fiber,
+      })
+    });
+    await confirmMeal(corrected);
   }
 
   return (
@@ -158,9 +208,7 @@ export default function Nutrition() {
       {tab === 'hoje' && (
         <>
           <FastingCard />
-        <>
-          <FastingCard />
-        <>
+
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div>
@@ -186,24 +234,6 @@ export default function Nutrition() {
               </div>
             </div>
           </div>
-
-          {lastMeal && (
-            <div className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: 500 }}>jejum intermitente · {fastingHours}h</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '2px' }}>próxima janela: {nextWindow}</div>
-                </div>
-                <span style={{ fontSize: '10px', fontWeight: 500, padding: '2px 8px', borderRadius: '20px', background: fastingHours >= 14 ? '#E1F5EE' : '#FAEEDA', color: fastingHours >= 14 ? '#085041' : '#633806' }}>
-                  {fastingHours >= 14 ? 'zona fat-burn' : 'a acumular'}
-                </span>
-              </div>
-              <div style={{ height: '8px', background: 'var(--bg3)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ height: '8px', borderRadius: '4px', width: `${Math.min(100, (fastingHours / 16) * 100)}%`, background: '#1D9E75' }} />
-              </div>
-              <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '3px' }}>objetivo 16h · {Math.round((fastingHours / 16) * 100)}%</div>
-            </div>
-          )}
 
           <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '1rem 0 .5rem' }}>macros</div>
           <div className="grid2">
@@ -253,19 +283,60 @@ export default function Nutrition() {
 
           {pending && (
             <div className="card">
-              <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>Confirma a refeição</div>
-              <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '8px' }}>{pending.description}</div>
-              {pending.items && <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>Identificado: {pending.items.join(', ')}</div>}
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: 'var(--bg3)' }}>{Math.round(pending.calories)} kcal</span>
-                <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: '#FAECE7', color: '#712B13' }}>P {Math.round(pending.protein)}g</span>
-                <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: '#FAEEDA', color: '#633806' }}>G {Math.round(pending.fat)}g</span>
-                <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: '#E6F1FB', color: '#0C447C' }}>F {Math.round(pending.fiber)}g</span>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="btn-primary" style={{ flex: 1 }} onClick={confirmMeal}>confirmar</button>
-                <button style={{ flex: 1, padding: '12px', border: '0.5px solid var(--border2)', borderRadius: 'var(--border-radius-md)', background: 'var(--bg)', color: 'var(--text)', fontSize: '14px', cursor: 'pointer' }} onClick={() => setPending(null)}>cancelar</button>
-              </div>
+              {!editMode ? (
+                <>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '6px' }}>a IA identificou</div>
+                  <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '4px' }}>{pending.description}</div>
+                  {pending.items && <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>{pending.items.join(', ')}</div>}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                    <span style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '10px', background: 'var(--bg3)', fontWeight: 500 }}>{Math.round(pending.calories)} kcal</span>
+                    <span style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '10px', background: '#FAECE7', color: '#712B13' }}>P {Math.round(pending.protein)}g</span>
+                    <span style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '10px', background: '#FAEEDA', color: '#633806' }}>G {Math.round(pending.fat)}g</span>
+                    <span style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '10px', background: '#E6F1FB', color: '#0C447C' }}>F {Math.round(pending.fiber)}g</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <button className="btn-primary" style={{ flex: 1 }} onClick={() => confirmMeal()}>✅ validar</button>
+                    <button onClick={() => setEditMode(true)} style={{ flex: 1, padding: '12px', border: '0.5px solid var(--border2)', borderRadius: 'var(--border-radius-md)', background: 'var(--bg)', color: 'var(--text)', fontSize: '14px', cursor: 'pointer' }}>✏️ corrigir</button>
+                  </div>
+                  <button onClick={() => { setPending(null); setEditMode(false); }} style={{ width: '100%', padding: '8px', border: 'none', background: 'none', color: 'var(--text3)', fontSize: '12px', cursor: 'pointer' }}>cancelar</button>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '10px' }}>corrige os valores</div>
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text2)', marginBottom: '4px' }}>descrição</div>
+                    <textarea
+                      value={editFields.description}
+                      onChange={e => setEditFields(f => ({ ...f, description: e.target.value }))}
+                      rows={2}
+                      style={{ width: '100%', background: 'var(--bg3)', border: '0.5px solid var(--border)', borderRadius: 'var(--border-radius-md)', color: 'var(--text)', fontSize: '13px', padding: '8px 10px', resize: 'none', fontFamily: 'inherit', lineHeight: 1.4 }}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+                    {[
+                      { key: 'calories', label: 'calorias', unit: 'kcal', color: 'var(--text)' },
+                      { key: 'protein',  label: 'proteína',  unit: 'g',    color: '#D85A30'    },
+                      { key: 'fat',      label: 'gordura',   unit: 'g',    color: '#EF9F27'    },
+                      { key: 'fiber',    label: 'fibra',     unit: 'g',    color: '#378ADD'    },
+                    ].map(({ key, label, unit, color }) => (
+                      <div key={key}>
+                        <div style={{ fontSize: '11px', color, marginBottom: '3px', fontWeight: 500 }}>{label} <span style={{ color: 'var(--text3)', fontWeight: 400 }}>({unit})</span></div>
+                        <input
+                          type="number" min="0" step="1"
+                          value={editFields[key]}
+                          onChange={e => setEditFields(f => ({ ...f, [key]: e.target.value }))}
+                          style={{ width: '100%', background: 'var(--bg3)', border: '0.5px solid var(--border)', borderRadius: 'var(--border-radius-md)', color: 'var(--text)', fontSize: '15px', fontWeight: 500, padding: '8px 10px', fontFamily: 'inherit' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <button className="btn-primary" style={{ flex: 1 }} onClick={confirmWithCorrection}>✅ guardar correção</button>
+                    <button onClick={() => setEditMode(false)} style={{ flex: 1, padding: '12px', border: '0.5px solid var(--border2)', borderRadius: 'var(--border-radius-md)', background: 'var(--bg)', color: 'var(--text)', fontSize: '14px', cursor: 'pointer' }}>← voltar</button>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', textAlign: 'center' }}>a correção é guardada para melhorar a IA 🧠</div>
+                </>
+              )}
             </div>
           )}
 
