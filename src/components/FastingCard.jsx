@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
-
-const API = 'https://coach-tiago-api-production.up.railway.app';
+import { apiFetch } from '../lib/config';
 
 export default function FastingCard() {
   const [lastMeal, setLastMeal] = useState(null);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    fetch(`${API}/meals/last`)
+    apiFetch('/meals/last')
       .then(r => r.json())
       .then(d => { if (d.meal) setLastMeal(d.meal); })
       .catch(() => {});

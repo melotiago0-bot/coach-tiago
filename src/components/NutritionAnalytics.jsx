@@ -1,13 +1,35 @@
 import { useState, useEffect } from 'react';
 import AnalyticsChart from './AnalyticsChart';
 
-const API = 'https://coach-tiago-api-production.up.railway.app';
+import { apiFetch } from '../lib/config';
+
 const BASAL = 1906;
 const PERIODS = [{ label: '7 dias', days: 7 }, { label: '1 mês', days: 30 }, { label: '1 ano', days: 365 }];
 
 function avg(arr) {
   const v = arr.filter(x => x != null && x > 0);
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+}
+
+function groupByDay(meals) {
+  const byDay = {};
+  for (const m of meals) {
+    if (!byDay[m.date]) {
+      byDay[m.date] = {
+        date: m.date,
+        total_calories: 0, total_protein: 0, total_fat: 0, total_fiber: 0,
+        first_meal_ts: Infinity, last_meal_ts: -Infinity,
+      };
+    }
+    const d = byDay[m.date];
+    d.total_calories += m.calories || 0;
+    d.total_protein += m.protein || 0;
+    d.total_fat += m.fat || 0;
+    d.total_fiber += m.fiber || 0;
+    if (m.ts < d.first_meal_ts) d.first_meal_ts = m.ts;
+    if (m.ts > d.last_meal_ts) d.last_meal_ts = m.ts;
+  }
+  return Object.values(byDay).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function KPI({ label, value, unit, sub, color }) {
@@ -37,10 +59,11 @@ export default function NutritionAnalytics() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch(`${API}/meals/analytics?days=${days}`).then(r => r.json()),
-      fetch(`${API}/health-data/range?days=${days}`).then(r => r.json()),
-    ]).then(([meals, healthData]) => {
-      setData((meals.days || []).sort((a, b) => a.date.localeCompare(b.date)));
+      apiFetch(`/meals/range?days=${days}`).then(r => r.json()),
+      apiFetch(`/health-data/range?days=${days}`).then(r => r.json()),
+    ]).then(([mealsRes, healthData]) => {
+      const meals = mealsRes.meals || [];
+      setData(groupByDay(meals));
       setHealth(Array.isArray(healthData) ? healthData.sort((a, b) => a.date.localeCompare(b.date)) : []);
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -55,10 +78,13 @@ export default function NutritionAnalytics() {
   const avgTotalBurned = avgActiveCals != null ? BASAL + avgActiveCals : null;
   const avgDeficit = avgTotalBurned && avgCals ? avgTotalBurned - avgCals : null;
 
-  const fastingData = data.map(d => {
-    if (!d.first_meal_ts || !d.last_meal_ts) return 0;
-    const sinceLastMeal = (d.first_meal_ts - (d.last_meal_ts - 86400)) / 3600;
-    return Math.max(0, Math.min(24, sinceLastMeal));
+  const fastingData = data.map((d, i) => {
+    if (i === 0) return 0;
+    const prevDay = data[i - 1];
+    if (!prevDay.last_meal_ts || prevDay.last_meal_ts === -Infinity) return 0;
+    if (!d.first_meal_ts || d.first_meal_ts === Infinity) return 0;
+    const hours = (d.first_meal_ts - prevDay.last_meal_ts) / 3600;
+    return Math.max(0, Math.min(24, hours));
   });
   const avgFasting = avg(fastingData.filter(h => h > 0));
 
@@ -70,8 +96,8 @@ export default function NutritionAnalytics() {
   });
   const deficitData = burnedData.map((b, i) => b - (calData[i] || 0));
 
-  const deficitColor = avgDeficit > 800 ? '#EF9F27' : avgDeficit > 300 ? '#1D9E75' : '#D85A30';
-  const deficitLabel = avgDeficit > 800 ? 'défice elevado' : avgDeficit > 300 ? 'zona ideal' : 'défice insuficiente';
+  const deficitColor = avgDeficit == null ? 'var(--text2)' : avgDeficit > 800 ? '#EF9F27' : avgDeficit > 300 ? '#1D9E75' : '#D85A30';
+  const deficitLabel = avgDeficit == null ? '—' : avgDeficit > 800 ? 'défice elevado' : avgDeficit > 300 ? 'zona ideal' : 'défice insuficiente';
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
@@ -103,7 +129,7 @@ export default function NutritionAnalytics() {
           <div className="metric-label" style={{ color: '#1D9E75', fontWeight: 500 }}>calorias · consumidas vs gastas</div>
           <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--text2)', margin: '4px 0' }}>
             <span><span style={{ display: 'inline-block', width: '16px', height: '2px', background: '#1D9E75', marginRight: '4px', verticalAlign: 'middle' }} />consumidas</span>
-            <span><span style={{ display: 'inline-block', width: '16px', height: '2px', background: '#D85A30', marginRight: '4px', verticalAlign: 'middle', borderTop: '2px dashed #D85A30' }} />gastas</span>
+            <span><span style={{ display: 'inline-block', width: '16px', height: '2px', background: '#D85A30', marginRight: '4px', verticalAlign: 'middle' }} />gastas</span>
           </div>
           <AnalyticsChart
             id={`nutri-cals-${pi}`}
@@ -133,7 +159,7 @@ export default function NutritionAnalytics() {
           <KPI label="proteína" value={avgProtein} unit="g" color="#D85A30" sub="objetivo ≥160g" />
           <KPI label="gordura" value={avgFat} unit="g" color="#EF9F27" sub="objetivo 80-100g" />
           <KPI label="fibra" value={avgFiber} unit="g" color="#378ADD" sub="objetivo ≥25g" />
-          <KPI label="jejum médio" value={avgFasting} unit="h" color="#7F77DD" sub="objetivo ≥16h" />
+          <KPI label="jejum médio" value={avgFasting?.toFixed(1)} unit="h" color="#7F77DD" sub="objetivo ≥16h" />
         </div>
       </>}
     </div>

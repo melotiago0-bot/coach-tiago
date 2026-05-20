@@ -48,6 +48,8 @@ body {
 
 .app { max-width: 480px; margin: 0 auto; padding-bottom: 2rem; }
 
+.app-sidebar { display: none; }
+
 .tabs {
   display: flex;
   border-bottom: 0.5px solid var(--border);

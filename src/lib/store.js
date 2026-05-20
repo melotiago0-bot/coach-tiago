@@ -3,8 +3,8 @@ const KEY = 'coach_tiago_v1';
 const DEFAULT_PROFILE = {
   name: 'Tiago',
   location: 'Lisboa',
-  raceDate: '2025-07-19',
-  planStart: '2025-05-13',
+  raceDate: '2026-07-19',
+  planStart: '2026-05-14',
   equipment: ['kb8kg', 'pool25m', 'bodyweight'],
   injuries: { finger: 'recovering', hipLeft: 'limited' },
 };
@@ -112,37 +112,3 @@ export function getSwimHistory(days = 365) {
   }));
 }
 
-export function getWeeklySummaries(weeks = 13) {
-  const history = getSwimHistory(weeks * 7);
-  const byWeek = {};
-  for (const s of history) {
-    const d = new Date(s.date);
-    const weekKey = `${d.getFullYear()}-W${String(Math.ceil(d.getDate()/7)).padStart(2,'0')}`;
-    if (!byWeek[weekKey]) byWeek[weekKey] = 0;
-    byWeek[weekKey] += s.meters;
-  }
-  return byWeek;
-}
-
-export function getMonthlySummaries(months = 12) {
-  const history = getSwimHistory(months * 30);
-  const byMonth = {};
-  for (const s of history) {
-    const d = new Date(s.date);
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    if (!byMonth[key]) byMonth[key] = 0;
-    byMonth[key] += s.meters;
-  }
-  return byMonth;
-}
-
-export function getYearlySummaries() {
-  const history = getSwimHistory(365);
-  const byYear = {};
-  for (const s of history) {
-    const year = new Date(s.date).getFullYear().toString();
-    if (!byYear[year]) byYear[year] = 0;
-    byYear[year] += s.meters;
-  }
-  return byYear;
-}

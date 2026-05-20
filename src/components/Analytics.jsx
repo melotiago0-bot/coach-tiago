@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getDaysToRace, getPlanProgress, getSwimPlan } from '../lib/engine';
 import AnalyticsChart from './AnalyticsChart';
+import { apiFetch } from '../lib/config';
 
-const API = 'https://coach-tiago-api-production.up.railway.app';
 const PERIODS = [{ label: '7 dias', days: 7 }, { label: '1 mês', days: 30 }, { label: '1 ano', days: 365 }];
 
 function avg(arr) {
@@ -43,7 +43,7 @@ export default function Analytics() {
   const days = PERIODS[pi].days;
 
   useEffect(() => {
-    fetch(`${API}/health-data/range?days=365`)
+    apiFetch('/health-data/range?days=365')
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setHistory(d.sort((a, b) => a.date.localeCompare(b.date))); setLoading(false); })
       .catch(() => setLoading(false));
