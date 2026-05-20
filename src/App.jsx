@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import WorkoutDay from './components/WorkoutDay';
 import Analytics from './components/Analytics';
 import Progress from './components/Progress';
 import Nutrition from './components/Nutrition';
+import LockScreen, { isSessionValid, markUnlocked, isPinSet } from './components/LockScreen';
 import { saveCheckin, getTodayCheckin, getMissedDays } from './lib/store';
 import { decideWorkout, getDaysToRace, getPlanProgress, getCurrentWeekPlan } from './lib/engine';
+import { apiFetch } from './lib/config';
 import './App.css';
-
-const API = 'https://coach-tiago-api-production.up.railway.app';
 
 const DEFAULT_CHECKIN = {
   sleep: 7, feeling: 'bem', finger: 'a recuperar',
@@ -59,6 +59,7 @@ function AppSidebar({ liveHealth, checkin }) {
 }
 
 export default function App() {
+  const [locked, setLocked] = useState(() => isPinSet() && !isSessionValid());
   const [tab, setTab] = useState('hoje');
   const [liveHealth, setLiveHealth] = useState(null);
   const saved = getTodayCheckin();
@@ -67,8 +68,23 @@ export default function App() {
   const [checkin, setCheckin] = useState(initialCheckin);
   const [workout, setWorkout] = useState(decideWorkout({ sleep: initialCheckin.sleep, hasBJJ: initialCheckin.hasBJJ, missedDays }));
 
+  /* auto-lock on inactivity */
   useEffect(() => {
-    fetch(`${API}/health-data/latest`)
+    if (!isPinSet()) return;
+    const events = ['click', 'keydown', 'touchstart', 'scroll'];
+    const refresh = () => markUnlocked();
+    events.forEach(e => window.addEventListener(e, refresh, { passive: true }));
+    const timer = setInterval(() => {
+      if (!isSessionValid()) setLocked(true);
+    }, 30_000); // check every 30s
+    return () => {
+      events.forEach(e => window.removeEventListener(e, refresh));
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    apiFetch('/health-data/latest')
       .then(r => r.json())
       .then(health => {
         if (!health.date) return;
@@ -83,7 +99,7 @@ export default function App() {
         setCheckin(autoCheckin);
         setWorkout(decideWorkout({ sleep: health.sleep_hours || 7, hasBJJ: health.has_bjj === 1, missedDays }));
 
-        fetch(`${API}/health-data/workouts/today`)
+        apiFetch('/health-data/workouts/today')
           .then(r => r.json())
           .then(data => {
             const swim = (data.workouts || []).find(w =>
@@ -107,6 +123,8 @@ export default function App() {
     { id: 'plano', label: 'plano' },
   ];
 
+  if (locked) return <LockScreen onUnlock={() => setLocked(false)} />;
+
   return (
     <div className="app">
       <div className="tabs">
@@ -118,7 +136,7 @@ export default function App() {
       </div>
       <div className="content">
         {tab === 'hoje' && <WorkoutDay checkin={checkin} workout={workout} liveHealth={liveHealth} />}
-        {tab === 'nutrição' && <Nutrition />}
+        {tab === 'nutrição' && <Nutrition liveHealth={liveHealth} />}
         {tab === 'analytics' && <Analytics />}
         {tab === 'plano' && <Progress />}
       </div>
