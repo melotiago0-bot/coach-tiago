@@ -59,7 +59,7 @@ function AppSidebar({ liveHealth, checkin }) {
 }
 
 export default function App() {
-  const [locked, setLocked] = useState(() => isPinSet() && !isSessionValid());
+  const [locked, setLocked] = useState(() => !isPinSet() || !isSessionValid());
   const [tab, setTab] = useState('hoje');
   const [liveHealth, setLiveHealth] = useState(null);
   const saved = getTodayCheckin();
