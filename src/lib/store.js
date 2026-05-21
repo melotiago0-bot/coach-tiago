@@ -35,6 +35,14 @@ export function saveCheckin(checkin) {
   saveStore(store);
 }
 
+/* guarda checkin para uma data específica (para sincronização com API histórica) */
+export function saveCheckinForDate(date, checkin) {
+  const store = loadStore();
+  store.checkins = store.checkins.filter(c => c.date !== date);
+  store.checkins.push({ ...checkin, date, ts: checkin.ts || Date.now() });
+  saveStore(store);
+}
+
 export function saveWorkoutDone(workout) {
   const store = loadStore();
   const today = new Date().toISOString().split('T')[0];
