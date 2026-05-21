@@ -15,7 +15,7 @@ export default function AnalyticsChart({ id, height = 80, type, labels, datasets
     const existing = Chart.getChart(ref.current);
     if (existing) existing.destroy();
 
-    new Chart(ref.current, {
+    const chart = new Chart(ref.current, {
       type,
       data: { labels, datasets },
       options: {
@@ -31,7 +31,9 @@ export default function AnalyticsChart({ id, height = 80, type, labels, datasets
         }
       }
     });
-  }, [labels, datasets]);
+
+    return () => chart.destroy();
+  }, [labels, datasets, type]);
 
   return (
     <div style={{ position: 'relative', height: `${height}px`, marginTop: '8px' }}>

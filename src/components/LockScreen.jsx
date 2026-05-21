@@ -4,6 +4,8 @@ const PIN_HASH_KEY   = 'ct_pin_hash';
 const CRED_KEY       = 'ct_webauthn_cred';
 const UNLOCKED_AT    = 'ct_unlocked_at';
 const AUTO_LOCK_MS   = 10 * 60 * 1000; // 10 min
+const MAX_ATTEMPTS   = 5;
+const LOCKOUT_MS     = 60 * 1000; // 1 min bloqueio após 5 tentativas erradas
 
 async function hashPin(pin) {
   const data = new TextEncoder().encode(pin + ':coach-tiago-v1');
@@ -34,6 +36,8 @@ export default function LockScreen({ onUnlock }) {
   const [error,     setError]     = useState('');
   const [shake,     setShake]     = useState(false);
   const [canBio,    setCanBio]    = useState(false);
+  const [attempts,  setAttempts]  = useState(0);
+  const [lockedUntil, setLockedUntil] = useState(null);
 
   /* check WebAuthn platform support */
   useEffect(() => {
@@ -139,14 +143,32 @@ export default function LockScreen({ onUnlock }) {
     }
 
     /* locked – verify */
+    if (lockedUntil && Date.now() < lockedUntil) {
+      const secsLeft = Math.ceil((lockedUntil - Date.now()) / 1000);
+      setError(`Bloqueado. Tenta em ${secsLeft}s.`);
+      setPin('');
+      return;
+    }
+
     const hash   = await hashPin(next);
     const stored = localStorage.getItem(PIN_HASH_KEY);
     if (hash === stored) {
+      setAttempts(0);
+      setLockedUntil(null);
       markUnlocked();
       onUnlock();
     } else {
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
       triggerShake();
-      setError('PIN incorreto');
+      if (newAttempts >= MAX_ATTEMPTS) {
+        const until = Date.now() + LOCKOUT_MS;
+        setLockedUntil(until);
+        setAttempts(0);
+        setError(`Muitas tentativas. Bloqueado por 1 min.`);
+      } else {
+        setError(`PIN incorreto · ${MAX_ATTEMPTS - newAttempts} tentativa${MAX_ATTEMPTS - newAttempts !== 1 ? 's' : ''} restante${MAX_ATTEMPTS - newAttempts !== 1 ? 's' : ''}`);
+      }
       setPin('');
     }
   }

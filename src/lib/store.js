@@ -91,7 +91,10 @@ export function getWeeklySwimVolume() {
   const store = loadStore();
   const weekStart = new Date();
   weekStart.setHours(0,0,0,0);
-  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  // Semana começa na segunda-feira (getDay: 0=dom,1=seg,...,6=sáb)
+  const day = weekStart.getDay();
+  const daysFromMonday = day === 0 ? 6 : day - 1;
+  weekStart.setDate(weekStart.getDate() - daysFromMonday);
   return store.checkins
     .filter(c => c.swam && new Date(c.date) >= weekStart)
     .reduce((sum, c) => sum + (c.swimMeters || 0), 0);

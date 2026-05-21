@@ -75,6 +75,7 @@ export default function Nutrition({ liveHealth }) {
   async function loadData() {
     const mealsRes = await apiFetch('/meals/today').then(r => r.json()).catch(() => ({ meals: [] }));
     setMeals(mealsRes.meals || []);
+    setDeficits(null); // limpa sugestões antigas ao recarregar
   }
 
   const totalCals = meals.reduce((s, m) => s + (m.calories || 0), 0);
@@ -109,26 +110,34 @@ export default function Nutrition({ liveHealth }) {
     setAnalyzing(true); setShowAdd(false);
     const reader = new FileReader();
     reader.onload = async (ev) => {
-      const b64 = ev.target.result.split(',')[1];
-      const res = await apiFetch('/meals/analyze-photo', {
-        method: 'POST',
-        body: JSON.stringify({ image: b64, meal_type: mealType })
-      }).then(r => r.json());
-      setAnalyzing(false);
-      if (res.status === 'ok') {
-        const analysis = { ...res.analysis, meal_type: mealType };
-        setPending(analysis);
-        setEditFields({
-          description: analysis.description || '',
-          calories: analysis.calories || 0,
-          protein: analysis.protein || 0,
-          fat: analysis.fat || 0,
-          fiber: analysis.fiber || 0,
-          carbs: analysis.carbs || 0,
-        });
-        setEditMode(false);
+      try {
+        const b64 = ev.target.result.split(',')[1];
+        const res = await apiFetch('/meals/analyze-photo', {
+          method: 'POST',
+          body: JSON.stringify({ image: b64, meal_type: mealType })
+        }).then(r => r.json());
+        setAnalyzing(false);
+        if (res.status === 'ok') {
+          const analysis = { ...res.analysis, meal_type: mealType };
+          setPending(analysis);
+          setEditFields({
+            description: analysis.description || '',
+            calories: analysis.calories || 0,
+            protein: analysis.protein || 0,
+            fat: analysis.fat || 0,
+            fiber: analysis.fiber || 0,
+            carbs: analysis.carbs || 0,
+          });
+          setEditMode(false);
+        } else {
+          alert('Erro ao analisar a foto. Tenta de novo.');
+        }
+      } catch {
+        setAnalyzing(false);
+        alert('Erro ao analisar a foto. Verifica a ligação.');
       }
     };
+    reader.onerror = () => { setAnalyzing(false); alert('Erro ao ler a foto.'); };
     reader.readAsDataURL(file);
   }
 
@@ -352,7 +361,7 @@ export default function Nutrition({ liveHealth }) {
               <div style={{ marginBottom: '12px' }}>
                 <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px' }}>tipo de refeição</div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {['almoço', 'jantar', 'snack', 'suplementos'].map(t => (
+                  {['pequeno-almoço', 'almoço', 'jantar', 'snack', 'suplementos'].map(t => (
                     <button key={t} onClick={() => setMealType(t)} style={{ fontSize: '12px', padding: '5px 12px', borderRadius: '20px', border: '0.5px solid', borderColor: mealType === t ? '#1D9E75' : 'var(--border2)', background: mealType === t ? '#E1F5EE' : 'var(--bg3)', color: mealType === t ? '#085041' : 'var(--text)', cursor: 'pointer' }}>{t}</button>
                   ))}
                 </div>
