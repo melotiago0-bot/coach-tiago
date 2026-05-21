@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import WorkoutDay from './components/WorkoutDay';
 import Analytics from './components/Analytics';
 import Progress from './components/Progress';
@@ -60,6 +60,7 @@ function AppSidebar({ liveHealth, checkin }) {
 
 export default function App() {
   const [locked, setLocked] = useState(() => !isPinSet() || !isSessionValid());
+  const handleUnlock = useCallback(() => setLocked(false), []);
   const [tab, setTab] = useState('hoje');
   const [liveHealth, setLiveHealth] = useState(null);
   const saved = getTodayCheckin();
@@ -123,7 +124,7 @@ export default function App() {
     { id: 'plano', label: 'plano' },
   ];
 
-  if (locked) return <LockScreen onUnlock={() => setLocked(false)} />;
+  if (locked) return <LockScreen onUnlock={handleUnlock} />;
 
   return (
     <div className="app">

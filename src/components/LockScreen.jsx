@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 const PIN_HASH_KEY   = 'ct_pin_hash';
 const CRED_KEY       = 'ct_webauthn_cred';
@@ -38,6 +38,7 @@ export default function LockScreen({ onUnlock }) {
   const [canBio,    setCanBio]    = useState(false);
   const [attempts,  setAttempts]  = useState(0);
   const [lockedUntil, setLockedUntil] = useState(null);
+  const bioTriggeredRef = useRef(false); // garante que o popup biométrico dispara só 1x
 
   /* check WebAuthn platform support */
   useEffect(() => {
@@ -56,8 +57,13 @@ export default function LockScreen({ onUnlock }) {
     }
   }, []);
 
-  /* auto-trigger biometric when entering locked mode */
+  /* auto-trigger biometric when entering locked mode — só 1x por montagem */
+  const onUnlockRef = useRef(onUnlock);
+  useEffect(() => { onUnlockRef.current = onUnlock; }, [onUnlock]);
+
   const tryBiometric = useCallback(async () => {
+    if (bioTriggeredRef.current) return;           // já disparou — ignora
+    bioTriggeredRef.current = true;
     const credId = localStorage.getItem(CRED_KEY);
     if (!credId || !window.PublicKeyCredential) return;
     try {
@@ -71,9 +77,9 @@ export default function LockScreen({ onUnlock }) {
           timeout: 60000,
         },
       });
-      if (res) { markUnlocked(); onUnlock(); }
-    } catch { /* cancelled – just show PIN */ }
-  }, [onUnlock]);
+      if (res) { markUnlocked(); onUnlockRef.current(); }
+    } catch { /* cancelado – mostra PIN */ }
+  }, []); // sem deps externas — usa refs
 
   useEffect(() => {
     if (mode === 'locked' && localStorage.getItem(CRED_KEY)) tryBiometric();
