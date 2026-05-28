@@ -33,7 +33,7 @@ function MacroBar({ label, current, goal, color, unit = 'g' }) {
   );
 }
 
-function MealCard({ meal }) {
+function MealCard({ meal, onDelete }) {
   const time = new Date(meal.ts * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
   return (
     <div style={{ padding: '10px 0', borderBottom: '0.5px solid var(--border)' }}>
@@ -47,9 +47,16 @@ function MealCard({ meal }) {
             <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '10px', background: '#E6F1FB', color: '#0C447C' }}>F {Math.round(meal.fiber)}g</span>
           </div>
         </div>
-        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '8px' }}>
-          <div style={{ fontSize: '16px', fontWeight: 500 }}>{Math.round(meal.calories)}</div>
-          <div style={{ fontSize: '10px', color: 'var(--text3)' }}>kcal</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '8px', flexShrink: 0 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '16px', fontWeight: 500 }}>{Math.round(meal.calories)}</div>
+            <div style={{ fontSize: '10px', color: 'var(--text3)' }}>kcal</div>
+          </div>
+          <button
+            onClick={() => onDelete(meal.id)}
+            style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: '16px', cursor: 'pointer', padding: '4px', lineHeight: 1 }}
+            title="apagar refeição"
+          >×</button>
         </div>
       </div>
     </div>
@@ -60,6 +67,7 @@ export default function Nutrition({ liveHealth }) {
   const [tab, setTab] = useState('hoje');
   const [meals, setMeals] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [pending, setPending] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editFields, setEditFields] = useState({});
@@ -75,7 +83,13 @@ export default function Nutrition({ liveHealth }) {
   async function loadData() {
     const mealsRes = await apiFetch('/meals/today').then(r => r.json()).catch(() => ({ meals: [] }));
     setMeals(mealsRes.meals || []);
-    setDeficits(null); // limpa sugestões antigas ao recarregar
+    setDeficits(null);
+  }
+
+  async function handleDelete(id) {
+    if (!confirm('Apagar esta refeição?')) return;
+    await apiFetch(`/meals/${id}`, { method: 'DELETE' }).catch(() => {});
+    await loadData();
   }
 
   const totalCals = meals.reduce((s, m) => s + (m.calories || 0), 0);
@@ -99,6 +113,24 @@ export default function Nutrition({ liveHealth }) {
 
   const MAX_PHOTO_MB = 5;
 
+  async function compressImage(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, 1200 / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
   async function handlePhoto(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -108,72 +140,82 @@ export default function Nutrition({ liveHealth }) {
       return;
     }
     setAnalyzing(true); setShowAdd(false);
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      try {
-        const b64 = ev.target.result.split(',')[1];
-        const res = await apiFetch('/meals/analyze-photo', {
-          method: 'POST',
-          body: JSON.stringify({ image: b64, meal_type: mealType })
-        }).then(r => r.json());
-        setAnalyzing(false);
-        if (res.status === 'ok') {
-          const analysis = { ...res.analysis, meal_type: mealType };
-          setPending(analysis);
-          setEditFields({
-            description: analysis.description || '',
-            calories: analysis.calories || 0,
-            protein: analysis.protein || 0,
-            fat: analysis.fat || 0,
-            fiber: analysis.fiber || 0,
-            carbs: analysis.carbs || 0,
-          });
-          setEditMode(false);
-        } else {
-          alert('Erro ao analisar a foto. Tenta de novo.');
-        }
-      } catch {
-        setAnalyzing(false);
-        alert('Erro ao analisar a foto. Verifica a ligação.');
+    try {
+      const b64 = await compressImage(file);
+      const res = await apiFetch('/meals/analyze-photo', {
+        method: 'POST',
+        body: JSON.stringify({ image: b64, meal_type: mealType })
+      }).then(r => r.json());
+      setAnalyzing(false);
+      if (res.status === 'ok') {
+        const analysis = { ...res.analysis, meal_type: mealType };
+        setPending(analysis);
+        setEditFields({
+          description: analysis.description || '',
+          calories: analysis.calories || 0,
+          protein: analysis.protein || 0,
+          fat: analysis.fat || 0,
+          fiber: analysis.fiber || 0,
+          carbs: analysis.carbs || 0,
+        });
+        setEditMode(false);
+      } else {
+        alert('Erro ao analisar a foto. Tenta de novo.');
       }
-    };
-    reader.onerror = () => { setAnalyzing(false); alert('Erro ao ler a foto.'); };
-    reader.readAsDataURL(file);
+    } catch {
+      setAnalyzing(false);
+      alert('Erro ao analisar a foto. Verifica a ligação.');
+    }
   }
 
   async function handleText() {
     if (!textInput.trim()) return;
     setAnalyzing(true); setShowAdd(false);
-    const res = await apiFetch('/meals/analyze-text', {
-      method: 'POST',
-      body: JSON.stringify({ text: textInput, meal_type: mealType })
-    }).then(r => r.json());
-    setAnalyzing(false); setTextInput('');
-    if (res.status === 'ok') {
-      const analysis = { ...res.analysis, meal_type: mealType };
-      setPending(analysis);
-      setEditFields({
-        description: analysis.description || '',
-        calories: analysis.calories || 0,
-        protein: analysis.protein || 0,
-        fat: analysis.fat || 0,
-        fiber: analysis.fiber || 0,
-        carbs: analysis.carbs || 0,
-      });
-      setEditMode(false);
+    try {
+      const res = await apiFetch('/meals/analyze-text', {
+        method: 'POST',
+        body: JSON.stringify({ text: textInput, meal_type: mealType })
+      }).then(r => r.json());
+      setAnalyzing(false); setTextInput('');
+      if (res.status === 'ok') {
+        const analysis = { ...res.analysis, meal_type: mealType };
+        setPending(analysis);
+        setEditFields({
+          description: analysis.description || '',
+          calories: analysis.calories || 0,
+          protein: analysis.protein || 0,
+          fat: analysis.fat || 0,
+          fiber: analysis.fiber || 0,
+          carbs: analysis.carbs || 0,
+        });
+        setEditMode(false);
+      } else {
+        alert('Erro ao analisar. Tenta de novo.');
+      }
+    } catch {
+      setAnalyzing(false);
+      alert('Erro ao analisar. Verifica a ligação.');
     }
   }
 
   async function confirmMeal(mealData = pending) {
-    await apiFetch('/meals', { method: 'POST', body: JSON.stringify(mealData) });
-    setPending(null); setEditMode(false);
-    await loadData();
-    const totals = { calories: totalCals + mealData.calories, protein: totalProtein + mealData.protein, fat: totalFat + mealData.fat, fiber: totalFiber + mealData.fiber, iron: totalIron + (mealData.iron||0), magnesium: totalMagnesium + (mealData.magnesium||0), zinc: totalZinc + (mealData.zinc||0), potassium: totalPotassium + (mealData.potassium||0), b12: totalB12 + (mealData.b12||0), vitamin_d: totalVitD + (mealData.vitamin_d||0) };
-    const res = await apiFetch('/meals/deficits', {
-      method: 'POST',
-      body: JSON.stringify({ meals, totals })
-    }).then(r => r.json());
-    setDeficits(res);
+    setSaving(true);
+    try {
+      const res = await apiFetch('/meals', { method: 'POST', body: JSON.stringify(mealData) });
+      if (!res.ok) throw new Error('save failed');
+      setPending(null); setEditMode(false);
+      await loadData();
+      const totals = { calories: totalCals + mealData.calories, protein: totalProtein + mealData.protein, fat: totalFat + mealData.fat, fiber: totalFiber + mealData.fiber, iron: totalIron + (mealData.iron||0), magnesium: totalMagnesium + (mealData.magnesium||0), zinc: totalZinc + (mealData.zinc||0), potassium: totalPotassium + (mealData.potassium||0), b12: totalB12 + (mealData.b12||0), vitamin_d: totalVitD + (mealData.vitamin_d||0) };
+      const defRes = await apiFetch('/meals/deficits', {
+        method: 'POST',
+        body: JSON.stringify({ meals, totals })
+      }).then(r => r.json());
+      setDeficits(defRes);
+    } catch {
+      alert('Erro ao guardar a refeição. Tenta de novo.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function confirmWithCorrection() {
@@ -285,7 +327,7 @@ export default function Nutrition({ liveHealth }) {
           <div className="card">
             {meals.length === 0
               ? <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '1rem 0' }}>ainda sem refeições hoje</div>
-              : meals.map((m, i) => <MealCard key={i} meal={m} />)}
+              : meals.map((m, i) => <MealCard key={i} meal={m} onDelete={handleDelete} />)}
           </div>
 
           {analyzing && <div className="card" style={{ textAlign: 'center', padding: '1.5rem' }}><div style={{ fontSize: '13px', color: 'var(--text2)' }}>a analisar com Claude...</div></div>}
@@ -304,7 +346,7 @@ export default function Nutrition({ liveHealth }) {
                     <span style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '10px', background: '#E6F1FB', color: '#0C447C' }}>F {Math.round(pending.fiber)}g</span>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                    <button className="btn-primary" style={{ flex: 1 }} onClick={() => confirmMeal()}>✅ validar</button>
+                    <button className="btn-primary" style={{ flex: 1 }} onClick={() => confirmMeal()} disabled={saving}>{saving ? 'a guardar...' : '✅ validar'}</button>
                     <button onClick={() => setEditMode(true)} style={{ flex: 1, padding: '12px', border: '0.5px solid var(--border2)', borderRadius: 'var(--border-radius-md)', background: 'var(--bg)', color: 'var(--text)', fontSize: '14px', cursor: 'pointer' }}>✏️ corrigir</button>
                   </div>
                   <button onClick={() => { setPending(null); setEditMode(false); }} style={{ width: '100%', padding: '8px', border: 'none', background: 'none', color: 'var(--text3)', fontSize: '12px', cursor: 'pointer' }}>cancelar</button>
@@ -340,7 +382,7 @@ export default function Nutrition({ liveHealth }) {
                     ))}
                   </div>
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                    <button className="btn-primary" style={{ flex: 1 }} onClick={confirmWithCorrection}>✅ guardar correção</button>
+                    <button className="btn-primary" style={{ flex: 1 }} onClick={confirmWithCorrection} disabled={saving}>{saving ? 'a guardar...' : '✅ guardar correção'}</button>
                     <button onClick={() => setEditMode(false)} style={{ flex: 1, padding: '12px', border: '0.5px solid var(--border2)', borderRadius: 'var(--border-radius-md)', background: 'var(--bg)', color: 'var(--text)', fontSize: '14px', cursor: 'pointer' }}>← voltar</button>
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)', textAlign: 'center' }}>a correção é guardada para melhorar a IA 🧠</div>

@@ -43,11 +43,12 @@ export default function Analytics() {
   const days = PERIODS[pi].days;
 
   useEffect(() => {
-    apiFetch('/health-data/range?days=365')
+    setLoading(true);
+    apiFetch(`/health-data/range?days=${Math.min(365, days * 2 + 70)}`)
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setHistory(d.sort((a, b) => a.date.localeCompare(b.date))); setLoading(false); })
       .catch(() => setLoading(false));
-  }, []);
+  }, [days]);
 
   const filtered = history.slice(-days);
   const prev = history.slice(-days * 2, -days);

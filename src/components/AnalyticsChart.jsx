@@ -1,16 +1,23 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Chart, BarController, LineController, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip } from 'chart.js';
 
 Chart.register(BarController, LineController, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip);
 
 export default function AnalyticsChart({ id, height = 80, type, labels, datasets, yCallback }) {
   const ref = useRef();
+  const [dark, setDark] = useState(() => matchMedia('(prefers-color-scheme: dark)').matches);
+
+  useEffect(() => {
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    const handler = e => setDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   useEffect(() => {
     if (!ref.current) return;
-    const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
-    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-    const textColor = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)';
+    const gridColor = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    const textColor = dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)';
 
     const existing = Chart.getChart(ref.current);
     if (existing) existing.destroy();
@@ -33,7 +40,7 @@ export default function AnalyticsChart({ id, height = 80, type, labels, datasets
     });
 
     return () => chart.destroy();
-  }, [labels, datasets, type]);
+  }, [labels, datasets, type, dark]);
 
   return (
     <div style={{ position: 'relative', height: `${height}px`, marginTop: '8px' }}>

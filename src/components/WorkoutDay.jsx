@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { saveWorkoutDone } from '../lib/store';
+import { saveWorkoutDone, getWorkoutLog } from '../lib/store';
 import { getSwimAnalysis, getDaysToRace, getCurrentWeekPlan } from '../lib/engine';
 import { templates } from '../lib/exercises';
 import MetricGauge, { HRV_CONFIG, RHR_CONFIG, SLEEP_CONFIG } from './MetricGauge';
@@ -85,7 +85,10 @@ function LiveMetrics({ liveHealth }) {
 }
 
 export default function WorkoutDay({ checkin, workout, liveHealth }) {
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return getWorkoutLog(2).some(w => w.date === today);
+  });
   const [notes, setNotes] = useState('');
   if (!checkin || !workout) return <div className="card center"><p>a carregar dados...</p></div>;
   if (workout.type === 'none') return (
