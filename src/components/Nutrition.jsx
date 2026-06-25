@@ -33,6 +33,12 @@ function MacroBar({ label, current, goal, color, unit = 'g' }) {
   );
 }
 
+function nowLocalInput() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function MealCard({ meal, onDelete }) {
   const time = new Date(meal.ts * 1000).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
   return (
@@ -76,6 +82,7 @@ export default function Nutrition({ liveHealth }) {
   const [addMode, setAddMode] = useState('text');
   const [textInput, setTextInput] = useState('');
   const [mealType, setMealType] = useState('almoço');
+  const [mealDT, setMealDT] = useState(nowLocalInput());
   const fileRef = useRef();
 
   useEffect(() => { loadData(); }, []);
@@ -148,7 +155,7 @@ export default function Nutrition({ liveHealth }) {
       }).then(r => r.json());
       setAnalyzing(false);
       if (res.status === 'ok') {
-        const analysis = { ...res.analysis, meal_type: mealType };
+        const analysis = { ...res.analysis, meal_type: mealType, _dt: mealDT };
         setPending(analysis);
         setEditFields({
           description: analysis.description || '',
@@ -178,7 +185,7 @@ export default function Nutrition({ liveHealth }) {
       }).then(r => r.json());
       setAnalyzing(false); setTextInput('');
       if (res.status === 'ok') {
-        const analysis = { ...res.analysis, meal_type: mealType };
+        const analysis = { ...res.analysis, meal_type: mealType, _dt: mealDT };
         setPending(analysis);
         setEditFields({
           description: analysis.description || '',
@@ -201,7 +208,14 @@ export default function Nutrition({ liveHealth }) {
   async function confirmMeal(mealData = pending) {
     setSaving(true);
     try {
-      const res = await apiFetch('/meals', { method: 'POST', body: JSON.stringify(mealData) });
+      const dt = mealData._dt;
+      const payload = { ...mealData };
+      delete payload._dt;
+      if (dt) {
+        payload.ts = Math.floor(new Date(dt).getTime() / 1000);
+        payload.date = dt.slice(0, 10);
+      }
+      const res = await apiFetch('/meals', { method: 'POST', body: JSON.stringify(payload) });
       if (!res.ok) throw new Error('save failed');
       setPending(null); setEditMode(false);
       await loadData();
@@ -339,6 +353,16 @@ export default function Nutrition({ liveHealth }) {
                   <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '6px' }}>a IA identificou</div>
                   <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '4px' }}>{pending.description}</div>
                   {pending.items && <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>{pending.items.join(', ')}</div>}
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text2)', marginBottom: '4px' }}>quando comeste</div>
+                    <input
+                      type="datetime-local"
+                      value={pending._dt || nowLocalInput()}
+                      max={nowLocalInput()}
+                      onChange={e => setPending(p => ({ ...p, _dt: e.target.value }))}
+                      style={{ width: '100%', background: 'var(--bg3)', border: '0.5px solid var(--border)', borderRadius: 'var(--border-radius-md)', color: 'var(--text)', fontSize: '14px', padding: '8px 10px', fontFamily: 'inherit' }}
+                    />
+                  </div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
                     <span style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '10px', background: 'var(--bg3)', fontWeight: 500 }}>{Math.round(pending.calories)} kcal</span>
                     <span style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '10px', background: '#FAECE7', color: '#712B13' }}>P {Math.round(pending.protein)}g</span>
@@ -393,13 +417,23 @@ export default function Nutrition({ liveHealth }) {
 
           {!showAdd && !pending && !analyzing && (
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn-primary" style={{ flex: 1 }} onClick={() => { setShowAdd(true); setAddMode('photo'); }}>📷 foto</button>
-              <button className="btn-primary" style={{ flex: 1, background: 'var(--bg3)', color: 'var(--text)' }} onClick={() => { setShowAdd(true); setAddMode('text'); }}>✏️ texto</button>
+              <button className="btn-primary" style={{ flex: 1 }} onClick={() => { setShowAdd(true); setAddMode('photo'); setMealDT(nowLocalInput()); }}>📷 foto</button>
+              <button className="btn-primary" style={{ flex: 1, background: 'var(--bg3)', color: 'var(--text)' }} onClick={() => { setShowAdd(true); setAddMode('text'); setMealDT(nowLocalInput()); }}>✏️ texto</button>
             </div>
           )}
 
           {showAdd && (
             <div className="card">
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px' }}>quando comeste</div>
+                <input
+                  type="datetime-local"
+                  value={mealDT}
+                  max={nowLocalInput()}
+                  onChange={e => setMealDT(e.target.value)}
+                  style={{ width: '100%', background: 'var(--bg3)', border: '0.5px solid var(--border)', borderRadius: 'var(--border-radius-md)', color: 'var(--text)', fontSize: '14px', padding: '8px 10px', fontFamily: 'inherit' }}
+                />
+              </div>
               <div style={{ marginBottom: '12px' }}>
                 <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '6px' }}>tipo de refeição</div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
