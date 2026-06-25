@@ -278,7 +278,7 @@ export default function Nutrition({ liveHealth }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div>
                 <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>défice calórico</div>
-                <div style={{ fontSize: '32px', fontWeight: 500, color: deficitColor }}>{deficit >= 0 ? '-' : '+'}{Math.abs(Math.round(deficit))} <span style={{ fontSize: '16px', fontWeight: 400, color: 'var(--text2)' }}>kcal</span></div>
+                <div className="num-hero" style={{ fontSize: '40px', fontWeight: 700, color: deficitColor }}>{deficit >= 0 ? '-' : '+'}{Math.abs(Math.round(deficit))} <span style={{ fontSize: '16px', fontWeight: 400, color: 'var(--text2)' }}>kcal</span></div>
                 <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '2px' }}>{deficitLabel} · objetivo -500 a -700</div>
               </div>
               <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: deficit >= 300 && deficit <= 800 ? '#E1F5EE' : '#FAEEDA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>

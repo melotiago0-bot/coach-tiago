@@ -209,8 +209,8 @@ export default function LockScreen({ onUnlock }) {
         {[0,1,2,3].map(i => (
           <div key={i} style={{
             ...styles.dot,
-            background:    i < pin.length ? '#1D9E75' : 'transparent',
-            borderColor:   i < pin.length ? '#1D9E75' : 'rgba(255,255,255,.3)',
+            background:    i < pin.length ? '#C6FF3A' : 'transparent',
+            borderColor:   i < pin.length ? '#C6FF3A' : 'rgba(255,255,255,.3)',
           }} />
         ))}
       </div>
@@ -250,20 +250,21 @@ export default function LockScreen({ onUnlock }) {
 const styles = {
   wrap: {
     position: 'fixed', inset: 0, zIndex: 9999,
-    background: 'linear-gradient(160deg,#0d1f1a 0%,#1a3a2f 60%,#0d1f1a 100%)',
+    background: 'radial-gradient(130% 90% at 50% -10%, rgba(198,255,58,0.12), transparent 55%), #0a0b0d',
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    fontFamily: 'system-ui,-apple-system,sans-serif',
+    fontFamily: "'Archivo', system-ui, -apple-system, sans-serif",
   },
-  title: { color: '#1D9E75', fontSize: 22, fontWeight: 700, margin: 0 },
-  sub:   { color: 'rgba(255,255,255,.45)', fontSize: 13, marginTop: 6 },
+  title: { color: '#C6FF3A', fontSize: 24, fontWeight: 700, margin: 0, fontFamily: "'Archivo Narrow','Archivo',sans-serif", textTransform: 'uppercase', letterSpacing: '0.04em' },
+  sub:   { color: 'rgba(242,244,243,.45)', fontSize: 13, marginTop: 6 },
   dots:  { display: 'flex', gap: 16 },
   dot:   { width: 14, height: 14, borderRadius: '50%', border: '2px solid', transition: 'all .15s' },
-  error: { color: '#ff6b6b', fontSize: 13, margin: 0, textAlign: 'center' },
+  error: { color: '#FF6B47', fontSize: 13, margin: 0, textAlign: 'center' },
   grid:  { display: 'grid', gridTemplateColumns: 'repeat(3, 72px)', gap: 12 },
   btn:   {
     width: 72, height: 72, borderRadius: '50%',
-    background: 'rgba(255,255,255,.09)', border: '1px solid rgba(255,255,255,.12)',
-    color: 'white', fontSize: 22, fontWeight: 500,
+    background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)',
+    color: '#f2f4f3', fontSize: 24, fontWeight: 600,
+    fontFamily: "'Archivo Narrow','Archivo',sans-serif",
     cursor: 'pointer', transition: 'background .15s, transform .1s',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },

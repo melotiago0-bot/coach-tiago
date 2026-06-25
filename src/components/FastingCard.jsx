@@ -44,8 +44,8 @@ export default function FastingCard() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
         <div>
           <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '4px' }}>jejum intermitente</div>
-          <div style={{ fontSize: '32px', fontWeight: 500, color: 'var(--text)', lineHeight: 1 }}>
-            {fastingH}<span style={{ fontSize: '16px', fontWeight: 400, color: 'var(--text2)' }}>h</span>{String(fastingM).padStart(2,'0')}<span style={{ fontSize: '16px', fontWeight: 400, color: 'var(--text2)' }}>m</span>
+          <div className="num-hero" style={{ fontSize: '40px', fontWeight: 700, color: 'var(--text)', lineHeight: 1 }}>
+            {fastingH}<span style={{ fontSize: '18px', fontWeight: 400, color: 'var(--text2)' }}>h</span>{String(fastingM).padStart(2,'0')}<span style={{ fontSize: '18px', fontWeight: 400, color: 'var(--text2)' }}>m</span>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '4px' }}>desde {lastDate} às {lastTime} · {lastMeal.meal_type}</div>
         </div>
