@@ -1,3 +1,4 @@
+// SW_VERSION: 2026-10-16b — bump para forçar atualização no cliente
 self.addEventListener('install', e => {
   self.skipWaiting();
 });
